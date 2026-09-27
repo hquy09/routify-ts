@@ -378,48 +378,36 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
-        {/* 2. ÁP LỰC & SỨC KHỎE TINH THẦN (Stress & Mental Health Telemetry) */}
-        <button
-          onClick={() => onNavigateTab?.('wellbeing')}
-          className={`flex items-center gap-1.5 py-1 px-2.5 rounded-md border text-xs font-semibold cursor-pointer transition hover:opacity-85 shrink-0 shadow-xs ${
-            isMentalHealthOn
-              ? `${tensionColorClass} ${isTensionHigh ? 'animate-pulse' : ''}`
-              : 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500'
-          }`}
-          title={
-            !isMentalHealthOn
-              ? 'Quản lý Sức khỏe Tinh thần (Đang tắt) • Click để mở và bật lại tính năng'
-              : tension
-              ? `Mức độ Áp lực: ${tension.tension_label} • Khối lượng học & làm việc: ${(tension.tension_score ?? 6.0).toFixed(1)}h/ngày
+        {/* 2. ÁP LỰC & SỨC KHỎE TINH THẦN (Stress & Mental Health Telemetry - Tạm ẩn khi vô hiệu hoá) */}
+        {isMentalHealthOn && (
+          <button
+            onClick={() => onNavigateTab?.('wellbeing')}
+            className={`flex items-center gap-1.5 py-1 px-2.5 rounded-md border text-xs font-semibold cursor-pointer transition hover:opacity-85 shrink-0 shadow-xs ${
+              tensionColorClass
+            } ${isTensionHigh ? 'animate-pulse' : ''}`}
+            title={
+              tension
+                ? `Mức độ Áp lực: ${tension.tension_label} • Khối lượng học & làm việc: ${(tension.tension_score ?? 6.0).toFixed(1)}h/ngày
 • Nguy cơ quá tải tuần: ${tension.weekly_risk_level === 'BURNOUT_RISK' ? 'Cảnh báo quá tải' : tension.weekly_risk_level === 'MODERATE' ? 'Căng thẳng vừa' : 'Tối ưu cân bằng'}
 • Click để mở Quản lý Sức khỏe Tinh thần & Cân bằng Cuộc sống`
-              : 'Mức độ Áp lực & Sức khỏe Tinh thần • Click để mở'
-          }
-        >
-          <HeartPulse
-            className={`w-3.5 h-3.5 shrink-0 ${
-              !isMentalHealthOn
-                ? 'text-slate-400 dark:text-slate-500'
-                : isTensionHigh
-                ? 'text-rose-500 animate-bounce'
-                : 'text-current'
-            }`}
-          />
-          <span className="flex items-center gap-1.5">
-            <span className={isMentalHealthOn ? 'font-medium text-slate-600 dark:text-slate-400' : 'font-medium text-slate-400 dark:text-slate-500'}>
-              Áp lực:
+                : 'Mức độ Áp lực & Sức khỏe Tinh thần • Click để mở'
+            }
+          >
+            <HeartPulse
+              className={`w-3.5 h-3.5 shrink-0 ${
+                isTensionHigh ? 'text-rose-500 animate-bounce' : 'text-current'
+              }`}
+            />
+            <span className="flex items-center gap-1.5">
+              <span className="font-medium text-slate-600 dark:text-slate-400">
+                Áp lực:
+              </span>
+              <strong className="font-mono">{(tension?.tension_score ?? 6.0).toFixed(1)}h</strong>
+              <span className="text-[10px] opacity-40 select-none">•</span>
+              <span className="truncate max-w-[85px] sm:max-w-none">{tension?.tension_label || 'Tối ưu'}</span>
             </span>
-            {isMentalHealthOn ? (
-              <>
-                <strong className="font-mono">{(tension?.tension_score ?? 6.0).toFixed(1)}h</strong>
-                <span className="text-[10px] opacity-40 select-none">•</span>
-                <span className="truncate max-w-[85px] sm:max-w-none">{tension?.tension_label || 'Tối ưu'}</span>
-              </>
-            ) : (
-              <span className="text-[11px] font-normal italic">(Đang tắt)</span>
-            )}
-          </span>
-        </button>
+          </button>
+        )}
 
         {/* 3. CHỈ SỐ NHẤT QUÁN & THỰC THI (Multi-day Statistical Consistency Index) */}
         <button

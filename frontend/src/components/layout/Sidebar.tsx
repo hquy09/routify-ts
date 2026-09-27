@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
+import { isMentalHealthEnabled } from '../../utils/featureFlags';
+
 export type NavTab = 'dashboard' | 'calendar' | 'tasks' | 'courses' | 'wellbeing' | 'screentime' | 'archive' | 'settings';
 
 interface SidebarProps {
@@ -50,12 +52,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenChangelog,
   onOpenAutoUpdate,
 }) => {
+  const isMentalHealthOn = isMentalHealthEnabled();
+
   const navItems: { id: NavTab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Tổng quan & Hiệu suất', icon: <BarChart3 className="w-4 h-4 shrink-0" /> },
     { id: 'calendar', label: 'Lịch biểu', icon: <CalendarIcon className="w-4 h-4 shrink-0" /> },
     { id: 'tasks', label: 'Nhiệm vụ', icon: <CheckSquare className="w-4 h-4 shrink-0" /> },
     { id: 'courses', label: 'Khóa học', icon: <BookOpen className="w-4 h-4 shrink-0" /> },
-    { id: 'wellbeing', label: 'Sức khỏe tinh thần', icon: <HeartPulse className="w-4 h-4 shrink-0 text-rose-500" /> },
+    ...(isMentalHealthOn
+      ? [{ id: 'wellbeing' as NavTab, label: 'Sức khỏe tinh thần', icon: <HeartPulse className="w-4 h-4 shrink-0 text-rose-500" /> }]
+      : []),
     { id: 'screentime', label: 'Cân bằng kỹ thuật số', icon: <Smartphone className="w-4 h-4 shrink-0" /> },
     { id: 'archive', label: 'Kho lưu trữ', icon: <Archive className="w-4 h-4 shrink-0" /> },
     { id: 'settings', label: 'Cài đặt', icon: <SettingsIcon className="w-4 h-4 shrink-0" /> },
@@ -100,8 +106,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight truncate">
                   Routify
                 </span>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-600 dark:text-indigo-400 select-none shrink-0 shadow-2xs">
-                  v1.2
+                <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-600 dark:text-indigo-400 select-none shrink-0 shadow-2xs font-mono">
+                  v27.9.6
                 </span>
               </div>
             )}
@@ -239,7 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onOpenChangelog}
                 className="w-8 h-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs transition cursor-pointer"
-                title="Nhật ký cập nhật (Changelog v1.2)"
+                title="Nhật ký cập nhật (Changelog v27.9.6)"
               >
                 <Sparkles className="w-4 h-4 text-amber-500" />
               </button>
@@ -291,10 +297,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {onOpenChangelog && (
                   <button
                     onClick={onOpenChangelog}
-                    className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono text-[10px] font-bold hover:bg-indigo-200 transition"
-                    title="Xem nhật ký cập nhật (Changelog)"
+                    className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono text-[10px] font-bold hover:bg-indigo-200 transition cursor-pointer"
+                    title="Xem nhật ký cập nhật (Changelog v27.9.6)"
                   >
-                    v1.2
+                    v27.9.6
                   </button>
                 )}
               </div>

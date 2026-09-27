@@ -2720,7 +2720,7 @@ export const SettingsPage: React.FC<{ isDark: boolean; onToggleTheme: () => void
                         <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
                           Tự động cập nhật từ GitHub (Auto Update)
                         </span>
-                        <Badge variant="default" className="text-[10px] py-0 px-2 font-mono bg-indigo-600 text-white hover:bg-indigo-700">v1.2.0</Badge>
+                        <Badge variant="default" className="text-[10px] py-0 px-2 font-mono bg-indigo-600 text-white hover:bg-indigo-700">v27.9.6 (c64b8ba)</Badge>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
                         Đồng bộ mã nguồn 1-click từ GitHub hoặc gói ZIP, bảo vệ an toàn 100% cơ sở dữ liệu SQLite

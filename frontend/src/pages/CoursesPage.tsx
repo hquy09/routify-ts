@@ -14,6 +14,7 @@ import { Course, CourseNode, Goal, FixedSchedule, CountdownItem, CountdownCoverC
 import { api } from '../services/api';
 import { Button } from '../components/ui/button';
 import { getCourseMasteryInfo, isCourseGamificationEnabled, setCourseGamificationEnabled, COURSE_RANK_TIERS } from '../utils/courseGamification';
+import { isMentalHealthEnabled } from '../utils/featureFlags';
 
 const COURSE_COLORS = [
   { label: 'Emerald', hex: '#10b981' },
@@ -889,31 +890,35 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onNavigateTab }) => {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Wellbeing & Mental Health Management Navigation */}
-              {onNavigateTab && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onNavigateTab('wellbeing')}
-                  className="text-xs font-semibold bg-gradient-to-r from-rose-50 to-indigo-50 dark:from-rose-950/40 dark:to-indigo-950/40 border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 hover:opacity-90 shadow-2xs"
-                  title="Mở bảng điều khiển Quản lý Sức khỏe Tinh thần & Độ Căng toàn diện"
-                >
-                  <HeartPulse className="w-3.5 h-3.5 text-rose-500 mr-1 animate-pulse" />
-                  <span>Quản lý Sức khỏe Tinh thần</span>
-                </Button>
-              )}
+              {/* Wellbeing & Mental Health Management Navigation (Tạm đóng khi tắt tính năng) */}
+              {isMentalHealthEnabled() && (
+                <>
+                  {onNavigateTab && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onNavigateTab('wellbeing')}
+                      className="text-xs font-semibold bg-gradient-to-r from-rose-50 to-indigo-50 dark:from-rose-950/40 dark:to-indigo-950/40 border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 hover:opacity-90 shadow-2xs"
+                      title="Mở bảng điều khiển Quản lý Sức khỏe Tinh thần & Độ Căng toàn diện"
+                    >
+                      <HeartPulse className="w-3.5 h-3.5 text-rose-500 mr-1 animate-pulse" />
+                      <span>Quản lý Sức khỏe Tinh thần</span>
+                    </Button>
+                  )}
 
-              {/* Quick Burnout & Sleep Modal */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsBurnoutModalOpen(true)}
-                className="text-xs font-semibold bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 hover:from-indigo-100 hover:to-purple-100 shadow-2xs"
-                title="Phân tích nhanh nguy cơ Burnout cho riêng khóa học này"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-500 mr-1" />
-                <span>Xem nhanh Burnout</span>
-              </Button>
+                  {/* Quick Burnout & Sleep Modal */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsBurnoutModalOpen(true)}
+                    className="text-xs font-semibold bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 hover:from-indigo-100 hover:to-purple-100 shadow-2xs"
+                    title="Phân tích nhanh nguy cơ Burnout cho riêng khóa học này"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-500 mr-1" />
+                    <span>Xem nhanh Burnout</span>
+                  </Button>
+                </>
+              )}
 
               <Button
                 variant="outline"

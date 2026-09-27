@@ -38,11 +38,17 @@ interface ChangelogModalProps {
 
 const DEFAULT_RELEASES: ChangelogRelease[] = [
   {
-    version: '1.2.0',
+    version: '27.9.6',
     date: '27/09/2026',
-    title: 'Bản Nâng Cấp Trải Nghiệm Hiệu Suất & Auto Update',
+    title: 'Bản Phát Hành v27.9.6 (Commit c64b8ba)',
     is_latest: true,
     highlights: [
+      {
+        category: 'Cập nhật từ GitHub',
+        icon: '🐙',
+        content:
+          'Tích hợp đồng bộ mã nguồn 1-click trực tiếp từ GitHub (hquy09/routify-ts:main) qua Git Pull hoặc GitHub Archive Zip. Lưu mốc hash c64b8ba để tự động đối chiếu các bản cập nhật mới tiếp theo.',
+      },
       {
         category: 'Hiệu suất cá nhân 2 Cột',
         icon: '📊',
@@ -53,19 +59,13 @@ const DEFAULT_RELEASES: ChangelogRelease[] = [
         category: 'Sidebar Tinh Giản',
         icon: '⚡',
         content:
-          'Chuyển các nút "Đánh giá tuần" và "Toàn màn hình" sang Sidebar bên trái với chế độ thu gọn/mở rộng trực quan, giải phóng không gian thanh điều khiển.',
+          'Chuyển các nút "Đánh giá tuần" và "Toàn màn hình" sang Sidebar bên trái với chế độ thu gọn/mở rộng trực quan, tích hợp huy hiệu phiên bản v27.9.6.',
       },
       {
-        category: 'Auto Update Phân Vùng App',
-        icon: '🔄',
+        category: 'Bảo vệ an toàn dữ liệu',
+        icon: '🛡️',
         content:
-          'Hỗ trợ tự động cập nhật và tự dán file trực tiếp vào phân vùng ứng dụng (Workspace Root), tự động tạo bản sao lưu khẩn cấp an toàn trước khi cập nhật.',
-      },
-      {
-        category: 'Changelog Lần Đầu Tiên',
-        icon: '✨',
-        content:
-          'Tự động hiển thị tóm tắt tính năng mới lần đầu truy cập và ghi nhớ lựa chọn tắt của người dùng, không gây gián đoạn.',
+          'Tự động tạo snapshot sao lưu khẩn cấp trước khi cập nhật. Tuyệt đối không bao giờ ghi đè tệp cơ sở dữ liệu SQLite lifeos.db của người dùng.',
       },
     ],
   },
@@ -133,7 +133,7 @@ export const ChangelogModal: React.FC<ChangelogModalProps> = ({
   isOpen,
   onClose,
   releases = DEFAULT_RELEASES,
-  currentVersion = '1.2.0',
+  currentVersion = '27.9.6',
   onOpenAutoUpdate,
 }) => {
   const [dontShowAgain, setDontShowAgain] = useState(true);

@@ -236,7 +236,51 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* Card 2: Tỷ lệ hoàn thành theo chu kỳ (Hôm nay, Tuần này, Tháng này) */}
+          {/* Card 2: Tiến độ Mục tiêu & Dự án (ĐẨY LÊN TRÊN THEO YÊU CẦU NGƯỜI DÙNG) */}
+          {stats && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Mục tiêu & Dự án quan trọng</span>
+                </span>
+                <span className="text-[10px] text-slate-400">{stats.goals.length} mục tiêu</span>
+              </div>
+
+              {stats.goals.length === 0 ? (
+                <p className="text-[11px] text-slate-400 text-center py-2 italic">
+                  Chưa có dữ liệu mục tiêu. Hãy tạo mục tiêu ở tab Nhiệm vụ.
+                </p>
+              ) : (
+                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                  {stats.goals.slice(0, 5).map((g) => (
+                    <div key={g.goal_id} className="p-2 rounded-xl bg-slate-50 dark:bg-slate-850/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
+                          {g.title}
+                        </span>
+                        <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
+                          {g.completion_rate}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-indigo-600 dark:bg-indigo-400 h-full rounded-full transition-all"
+                          style={{ width: `${g.completion_rate}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>{g.category || 'Mục tiêu'}</span>
+                        <span>{g.completed_tasks}/{g.total_tasks} hoàn thành</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Card 3: Tỷ lệ hoàn thành theo chu kỳ (Hôm nay, Tuần này, Tháng này) */}
           {stats && (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
               <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
@@ -295,70 +339,12 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Card 3: Tiến độ Mục tiêu & Dự án (Thu gọn cô đọng) */}
-          {stats && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
-              <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Mục tiêu & Dự án quan trọng</span>
-                </span>
-                <span className="text-[10px] text-slate-400">{stats.goals.length} mục tiêu</span>
-              </div>
-
-              {stats.goals.length === 0 ? (
-                <p className="text-[11px] text-slate-400 text-center py-2 italic">
-                  Chưa có dữ liệu mục tiêu. Hãy tạo mục tiêu ở tab Nhiệm vụ.
-                </p>
-              ) : (
-                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                  {stats.goals.slice(0, 5).map((g) => (
-                    <div key={g.goal_id} className="p-2 rounded-xl bg-slate-50 dark:bg-slate-850/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
-                          {g.title}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
-                          {g.completion_rate}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="bg-indigo-600 dark:bg-indigo-400 h-full rounded-full transition-all"
-                          style={{ width: `${g.completion_rate}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[10px] text-slate-400">
-                        <span>{g.category || 'Mục tiêu'}</span>
-                        <span>{g.completed_tasks}/{g.total_tasks} hoàn thành</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* ================= RIGHT COLUMN: HIỂN THỊ BIỂU ĐỒ & HEATMAP CANVAS RỘNG ================= */}
+        {/* ================= RIGHT COLUMN: MỤC TIÊU & ĐẾM NGƯỢC LÊN ĐẦU, TIẾP ĐẾN LÀ BIỂU ĐỒ & HEATMAP ================= */}
         <div className="xl:col-span-8 space-y-5">
           
-          {/* 1. Biểu đồ cột năng suất theo thời gian (DailyBarChart) */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
-            <DailyBarChart
-              items={chartItems}
-              period={period}
-              onChangePeriod={(p) => setPeriod(p)}
-            />
-          </div>
-
-          {/* 2. Bản đồ nhiệt hoạt động đóng góp (ActivityHeatmap) */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
-            <ActivityHeatmap days={heatmapDays} />
-          </div>
-
-          {/* 3. Phân bổ dự án & sự kiện đếm ngược */}
+          {/* 1. Phân bổ mục tiêu & sự kiện đếm ngược (ĐẨY LÊN ĐẦU THEO YÊU CẦU NGƯỜI DÙNG) */}
           <CountdownSection
             countdowns={countdowns}
             onOpenCreate={() => {
@@ -372,6 +358,20 @@ export const DashboardPage: React.FC = () => {
             onDelete={handleDeleteCountdown}
             onTogglePin={handleTogglePinCountdown}
           />
+
+          {/* 2. Biểu đồ cột năng suất theo thời gian (DailyBarChart) */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
+            <DailyBarChart
+              items={chartItems}
+              period={period}
+              onChangePeriod={(p) => setPeriod(p)}
+            />
+          </div>
+
+          {/* 3. Bản đồ nhiệt hoạt động đóng góp (ActivityHeatmap) */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
+            <ActivityHeatmap days={heatmapDays} />
+          </div>
         </div>
       </div>
 

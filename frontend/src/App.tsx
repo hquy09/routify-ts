@@ -18,7 +18,7 @@ import { AutoUpdateModal } from './components/common/AutoUpdateModal';
 import { Goal, HeaderSummary } from './types';
 import { api } from './services/api';
 
-const CURRENT_APP_VERSION = '1.2.0';
+const CURRENT_APP_VERSION = '27.9.6';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');

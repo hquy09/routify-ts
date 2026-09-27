@@ -8,14 +8,15 @@ const DIGITAL_WELLBEING_KEY = 'lifeos_digital_wellbeing_enabled';
 
 /**
  * Check whether Mental Health & Cognitive Load management is enabled.
- * Default: TRUE (BẬT)
+ * Default: FALSE (Tạm thời vô hiệu hóa / Tạm closed theo yêu cầu)
  */
 export function isMentalHealthEnabled(): boolean {
   try {
     const val = localStorage.getItem(MENTAL_HEALTH_KEY);
-    return val === null ? true : val === 'true';
+    // If not explicitly set to 'true', default is closed (false)
+    return val === 'true';
   } catch {
-    return true;
+    return false;
   }
 }
 

@@ -215,7 +215,7 @@ export const AutoUpdateModal: React.FC<AutoUpdateModalProps> = ({
               <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base leading-tight flex items-center gap-2">
                 <span>Cập nhật ứng dụng từ GitHub</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-300/60 dark:border-indigo-800 font-mono">
-                  v{updateInfo?.current_version || '1.2.0'}
+                  v{updateInfo?.current_version || '27.9.6'} ({localCommit?.short_sha || 'c64b8ba'})
                 </span>
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">

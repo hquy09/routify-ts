@@ -248,3 +248,37 @@ html:not(.dark) textarea:focus {
   animation: rankFlameShimmer 2s ease-in-out infinite;
 }
 
+/* ==========================================================================
+   PINNED GOAL & COUNTDOWN CONTINUOUS SURROUNDING AURA / HALO
+   ========================================================================== */
+@keyframes pinnedAuraPulse {
+  0%, 100% {
+    transform: scale(1.018);
+    opacity: 0.8;
+    filter: blur(14px) drop-shadow(0 0 16px rgba(251, 191, 36, 0.65));
+  }
+  50% {
+    transform: scale(1.038);
+    opacity: 1;
+    filter: blur(22px) drop-shadow(0 0 28px rgba(245, 158, 11, 0.9));
+  }
+}
+
+@keyframes pinnedAuraHueRotate {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    filter: hue-rotate(18deg);
+  }
+  100% {
+    filter: hue-rotate(0deg);
+  }
+}
+
+.animate-pinned-aura {
+  animation: pinnedAuraPulse 3s ease-in-out infinite, pinnedAuraHueRotate 6s ease-in-out infinite;
+  will-change: transform, opacity, filter;
+}
+
+

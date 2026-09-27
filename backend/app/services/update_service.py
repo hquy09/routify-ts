@@ -15,35 +15,37 @@ from app.services.gdrive_service import create_local_safety_backup, log_sync_eve
 # Root directory of the application partition (c:\Users\Huu Quy\Pictures\lifeos)
 APP_ROOT_DIR = BASE_DIR.parent
 
-CURRENT_APP_VERSION = "1.2.0"
+CURRENT_APP_VERSION = "27.9.6"
+CURRENT_COMMIT_HASH = "c64b8ba"
 RELEASE_DATE = "2026-09-27"
 
 CHANGELOG_HISTORY = [
     {
-        "version": "1.2.0",
+        "version": "27.9.6",
         "date": "27/09/2026",
-        "title": "Bản Nâng Cấp Trải Nghiệm Hiệu Suất & Auto Update",
+        "commit_hash": "c64b8ba",
+        "title": "Bản Phát Hành v27.9.6 (Commit c64b8ba)",
         "is_latest": True,
         "highlights": [
             {
-                "category": "Hiệu suất cá nhân",
+                "category": "Cập nhật từ GitHub",
+                "icon": "🐙",
+                "content": "Tích hợp đồng bộ mã nguồn 1-click trực tiếp từ GitHub repository (hquy09/routify-ts:main). Lưu mốc đối chiếu commit c64b8ba để tự động phát hiện mọi bản cập nhật mới tiếp theo."
+            },
+            {
+                "category": "Hiệu suất cá nhân 2 cột",
                 "icon": "📊",
                 "content": "Tái cấu trúc bố cục 2 cột chuyên nghiệp: Cột trái thu gọn tất cả trạng thái hoàn thành, điểm nỗ lực XP, chuỗi ngày streak và chậm trễ; Cột phải mở rộng canvas cho biểu đồ cột và bản đồ nhiệt Heatmap."
             },
             {
                 "category": "Sidebar tinh giản",
                 "icon": "⚡",
-                "content": "Di chuyển nút 'Đánh giá tuần' và 'Toàn màn hình' sang Sidebar bên trái với chế độ thu gọn/mở rộng trực quan, giải phóng thanh điều khiển trang."
+                "content": "Di chuyển nút 'Đánh giá tuần' và 'Toàn màn hình' sang Sidebar bên trái với chế độ thu gọn/mở rộng trực quan, tích hợp huy hiệu phiên bản v27.9.6."
             },
             {
-                "category": "Auto Update tự dán file",
-                "icon": "🔄",
-                "content": "Hệ thống tự động cập nhật và tự dán file vào phân vùng app (Workspace Root), tự động tạo bản sao lưu an toàn trước khi cập nhật."
-            },
-            {
-                "category": "Changelog thông minh",
-                "icon": "✨",
-                "content": "Tự động hiển thị nhật ký cập nhật (Changelog) lần đầu khi mở app với tùy chọn tắt và không làm phiền lại."
+                "category": "Auto Update an toàn tuyệt đối",
+                "icon": "🛡️",
+                "content": "Hệ thống tự động tạo snapshot sao lưu trước khi cập nhật. Tuyệt đối không bao giờ ghi đè tệp cơ sở dữ liệu SQLite lifeos.db."
             }
         ]
     },
@@ -105,12 +107,18 @@ class UpdateService:
     def get_info(cls, db: Session) -> Dict[str, Any]:
         """Returns application version, partition path, and changelog history."""
         setting = db.query(AppSetting).filter(AppSetting.key == "app_version").first()
+        setting = db.query(AppSetting).filter(AppSetting.key == "app_version").first()
         current_version = setting.value if setting and setting.value else CURRENT_APP_VERSION
+
+        setting_hash = db.query(AppSetting).filter(AppSetting.key == "app_commit_hash").first()
+        current_commit = setting_hash.value if setting_hash and setting_hash.value else CURRENT_COMMIT_HASH
 
         return {
             "app_name": "Routify LifeOS",
             "current_version": current_version,
+            "current_commit": current_commit,
             "latest_version": CURRENT_APP_VERSION,
+            "latest_commit": CURRENT_COMMIT_HASH,
             "release_date": RELEASE_DATE,
             "app_root_dir": str(APP_ROOT_DIR),
             "storage_dir": str(BACKUPS_DIR.parent),
@@ -220,19 +228,32 @@ class UpdateService:
         }
 
     @classmethod
-    def get_local_git_info(cls) -> Dict[str, Any]:
+    def get_local_git_info(cls, db: Optional[Session] = None) -> Dict[str, Any]:
         """Returns local git repository status, current commit, branch, and uncommitted status."""
         git_dir = APP_ROOT_DIR / ".git"
+
+        # Baseline stored version and hash
+        stored_hash = CURRENT_COMMIT_HASH
+        stored_version = CURRENT_APP_VERSION
+        if db:
+            setting_hash = db.query(AppSetting).filter(AppSetting.key == "app_commit_hash").first()
+            if setting_hash and setting_hash.value:
+                stored_hash = setting_hash.value.strip()
+            setting_ver = db.query(AppSetting).filter(AppSetting.key == "app_version").first()
+            if setting_ver and setting_ver.value:
+                stored_version = setting_ver.value.strip()
+
         if not git_dir.exists():
             return {
                 "is_git_repo": False,
                 "repo": "hquy09/routify-ts",
                 "branch": "main",
-                "sha": "",
-                "short_sha": "",
-                "author": "",
-                "date": "",
-                "message": "",
+                "version": stored_version,
+                "sha": stored_hash,
+                "short_sha": stored_hash[:7],
+                "author": "Huu Quy(cookie)",
+                "date": RELEASE_DATE,
+                "message": f"Routify LifeOS v{stored_version} ({stored_hash[:7]})",
                 "has_uncommitted": False,
                 "uncommitted_files_count": 0
             }
@@ -255,6 +276,11 @@ class UpdateService:
                 author = parts[2] if len(parts) > 2 else ""
                 date = parts[3] if len(parts) > 3 else ""
                 message = parts[4] if len(parts) > 4 else ""
+
+            # Use the established version baseline commit hash requested by user
+            if stored_hash:
+                sha = stored_hash
+                short_sha = stored_hash[:7]
 
             p_branch = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
@@ -293,11 +319,12 @@ class UpdateService:
 
             return {
                 "is_git_repo": True,
+                "version": stored_version,
                 "sha": sha,
                 "short_sha": short_sha,
-                "author": author,
-                "date": date,
-                "message": message,
+                "author": author or "Huu Quy(cookie)",
+                "date": date or RELEASE_DATE,
+                "message": message or f"Bản phát hành v{stored_version} ({short_sha})",
                 "branch": branch,
                 "remote_url": remote_url,
                 "repo": repo,
@@ -309,13 +336,16 @@ class UpdateService:
                 "is_git_repo": True,
                 "repo": "hquy09/routify-ts",
                 "branch": "main",
+                "version": stored_version,
+                "sha": stored_hash,
+                "short_sha": stored_hash[:7],
                 "error": str(e)
             }
 
     @classmethod
     def get_github_config(cls, db: Session) -> Dict[str, Any]:
         """Returns GitHub updater configuration stored in AppSetting."""
-        git_info = cls.get_local_git_info()
+        git_info = cls.get_local_git_info(db)
         default_repo = git_info.get("repo") or "hquy09/routify-ts"
         default_branch = git_info.get("branch") or "main"
 
@@ -362,7 +392,7 @@ class UpdateService:
         target_branch = branch or config.get("branch") or "main"
         auth_token = token if token is not None else config.get("token") or None
 
-        local_info = cls.get_local_git_info()
+        local_info = cls.get_local_git_info(db)
         local_sha = local_info.get("sha", "")
         local_short_sha = local_info.get("short_sha", "")
 
@@ -625,12 +655,39 @@ class UpdateService:
             except Exception as e:
                 raise RuntimeError(f"Lỗi khi tải hoặc dán tệp từ GitHub: {str(e)}")
 
+        # Update recorded commit hash in database after successful update
+        new_commit = ""
+        try:
+            if applied_mode == "git_pull":
+                p_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(APP_ROOT_DIR), capture_output=True, text=True, timeout=5)
+                if p_head.returncode == 0 and p_head.stdout.strip():
+                    new_commit = p_head.stdout.strip()[:7]
+            else:
+                # In download_zip, fetch latest commit sha of the branch from GitHub to update baseline
+                try:
+                    with httpx.Client(timeout=10.0) as client:
+                        api_res = client.get(f"https://api.github.com/repos/{target_repo}/commits?sha={target_branch}&per_page=1", headers={"User-Agent": "Routify-LifeOS-Updater"})
+                        if api_res.status_code == 200 and len(api_res.json()) > 0:
+                            new_commit = api_res.json()[0]["sha"][:7]
+                except Exception:
+                    pass
+
+            if new_commit:
+                setting_hash = db.query(AppSetting).filter(AppSetting.key == "app_commit_hash").first()
+                if not setting_hash:
+                    db.add(AppSetting(key="app_commit_hash", value=new_commit))
+                else:
+                    setting_hash.value = new_commit
+                db.commit()
+        except Exception:
+            pass
+
         # Log event
         log_sync_event(
             db,
             sync_type="GITHUB_UPDATE",
             status="COMPLETED",
-            details=f"Cập nhật từ GitHub ({applied_mode}): {output_details[:200]}. Sao lưu an toàn: {safety_backup.name}"
+            details=f"Cập nhật từ GitHub ({applied_mode}): {output_details[:200]}. Bản commit mới: {new_commit or 'giữ nguyên'}. Sao lưu: {safety_backup.name}"
         )
 
         return {
@@ -642,6 +699,7 @@ class UpdateService:
             "safety_backup": safety_backup.name,
             "repo": target_repo,
             "branch": target_branch,
+            "new_commit": new_commit,
             "timestamp": datetime.now().isoformat()
         }
 

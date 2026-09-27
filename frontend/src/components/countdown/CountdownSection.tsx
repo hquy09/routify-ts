@@ -225,23 +225,31 @@ export const CountdownSection: React.FC<CountdownSectionProps> = ({
               : 'text-left';
 
           return (
-            <div
-              key={item.id}
-              className={`rounded-2xl border p-4 transition-all shadow-xs flex flex-col justify-between relative overflow-hidden ${
-                isFonty
-                  ? 'text-white border-transparent shadow-md'
-                  : isSwiss
-                  ? 'bg-neutral-950 dark:bg-black text-white border-neutral-800 shadow-md'
-                  : isGridStyle
-                  ? 'bg-neutral-900 dark:bg-neutral-950 text-white border-neutral-800 shadow-md'
-                  : coverStyle === 'MINIMAL'
-                  ? 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100'
-                  : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100'
-              } ${
-                item.is_pinned
-                  ? 'ring-2 ring-amber-400/60 dark:ring-amber-400/50 shadow-md'
-                  : ''
-              }`}
+            <div key={item.id} className="relative group">
+              {/* Pinned Goal Continuous Surrounding Aura / Halo */}
+              {item.is_pinned && (
+                <div
+                  className="absolute -inset-1 sm:-inset-1.5 rounded-3xl bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 opacity-75 blur-md animate-pinned-aura pointer-events-none z-0"
+                  aria-hidden="true"
+                />
+              )}
+
+              <div
+                className={`rounded-2xl border p-4 transition-all shadow-xs flex flex-col justify-between relative overflow-hidden h-full z-10 ${
+                  isFonty
+                    ? 'text-white border-transparent shadow-md'
+                    : isSwiss
+                    ? 'bg-neutral-950 dark:bg-black text-white border-neutral-800 shadow-md'
+                    : isGridStyle
+                    ? 'bg-neutral-900 dark:bg-neutral-950 text-white border-neutral-800 shadow-md'
+                    : coverStyle === 'MINIMAL'
+                    ? 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100'
+                    : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100'
+                } ${
+                  item.is_pinned
+                    ? 'ring-2 ring-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)] dark:shadow-[0_0_35px_rgba(251,191,36,0.45)]'
+                    : ''
+                }`}
               style={{
                 background: isFonty
                   ? `linear-gradient(135deg, ${gradientColor1}, ${gradientColor2})`
@@ -558,6 +566,7 @@ export const CountdownSection: React.FC<CountdownSectionProps> = ({
                   <span>{diff.text}</span>
                 )}
               </div>
+            </div>
             </div>
           );
         })}
