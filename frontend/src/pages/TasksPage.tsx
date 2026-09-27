@@ -1,23 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search, Plus, Filter, ArrowUp, ArrowDown,
-  LayoutList, LayoutGrid, ChevronDown, ChevronRight,
+  LayoutList, LayoutGrid, Table, ChevronDown, ChevronRight,
   Clock, Flame, CheckCircle2, Circle, Target,
-  Eye, EyeOff, CornerDownRight, X, Pin, RotateCcw
+  Eye, EyeOff, CornerDownRight, X, Pin, RotateCcw,
+  Calendar, ChevronLeft, AlertTriangle, Sparkles, RefreshCw
 } from 'lucide-react';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskRowItem } from '../components/tasks/TaskRowItem';
+import { TaskExcelTable } from '../components/tasks/TaskExcelTable';
+import { TaskBacklogModal } from '../components/tasks/TaskBacklogModal';
 import { TaskModal } from '../components/tasks/TaskModal';
 import { TaskTransferModal } from '../components/tasks/TaskTransferModal';
 import { Task, Goal, Course, CountdownItem, PRIORITY_CONFIG, PriorityLevel, TaskStatus } from '../types';
 import { api } from '../services/api';
 import { Button } from '../components/ui/button';
-import { formatDatetimeForBackend, toLocalDateString } from '../utils/dateUtils';
+import { formatDatetimeForBackend, toLocalDateString, getWeekDateRange, addWeeks } from '../utils/dateUtils';
 
 type GroupByMode = 'COURSE' | 'TIME' | 'PRIORITY' | 'STATUS' | 'GOAL' | 'NONE';
-type SortByMode = 'DUE' | 'PRIORITY' | 'DIFFICULTY' | 'CREATED' | 'TITLE' | 'PROGRESS';
+type SortByMode = 'DUE' | 'PRIORITY' | 'DIFFICULTY' | 'CREATED' | 'TITLE' | 'PROGRESS' | 'STATUS';
 type SortOrder = 'ASC' | 'DESC';
-type ViewLayout = 'ROWS' | 'CARDS';
+type ViewLayout = 'EXCEL' | 'CARDS' | 'ROWS';
 
 interface TaskGroup {
   id: string;
@@ -100,6 +103,13 @@ export const TasksPage: React.FC = () => {
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Weekly Navigation State ("view theo tuần, tuần mới thì task mất đi, tuần nào chưa xong thì báo lại")
+  const [currentWeekDate, setCurrentWeekDate] = useState<Date>(new Date());
+  const [isAllWeeksMode, setIsAllWeeksMode] = useState<boolean>(false);
+  const [unfinishedSummary, setUnfinishedSummary] = useState<any>(null);
+  const [isBacklogModalOpen, setIsBacklogModalOpen] = useState(false);
+  const [isRollingOver, setIsRollingOver] = useState(false);
+
   // Primary Filters
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'UPCOMING' | 'DELAYED' | 'COMPLETED'>('ALL');
@@ -112,11 +122,11 @@ export const TasksPage: React.FC = () => {
   const [selectedPriority, setSelectedPriority] = useState<string>('ALL');
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
-  // Layering & Sorting Controls
+  // Layering, View Mode & Sorting Controls (Default: EXCEL view as requested)
   const [groupBy, setGroupBy] = useState<GroupByMode>('COURSE');
   const [sortBy, setSortBy] = useState<SortByMode>('DUE');
   const [sortOrder, setSortOrder] = useState<SortOrder>('ASC');
-  const [viewLayout, setViewLayout] = useState<ViewLayout>('CARDS');
+  const [viewLayout, setViewLayout] = useState<ViewLayout>('EXCEL');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [hideCompletedCards, setHideCompletedCards] = useState<boolean>(false);
 
@@ -126,12 +136,20 @@ export const TasksPage: React.FC = () => {
   const [taskToTransfer, setTaskToTransfer] = useState<Task | null>(null);
   const [modalInitialStatus, setModalInitialStatus] = useState<TaskStatus | undefined>(undefined);
 
+  // Calculate current week range and info
+  const weekInfo = useMemo(() => getWeekDateRange(currentWeekDate), [currentWeekDate]);
+  const isCurrentCalendarWeek = useMemo(() => {
+    const thisWeek = getWeekDateRange(new Date());
+    return thisWeek.mondayStr === weekInfo.mondayStr;
+  }, [weekInfo]);
+
   const loadTasks = async () => {
     setIsLoading(true);
     try {
       const res = await api.tasks.list({
         search: search.trim() || undefined,
         date_filter: dateFilter !== 'ALL' ? dateFilter : undefined,
+        week_date: !isAllWeeksMode && dateFilter === 'ALL' ? weekInfo.mondayStr : undefined,
         goal_id: selectedGoalId,
         status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
         difficulty: selectedDifficulty,
@@ -142,6 +160,15 @@ export const TasksPage: React.FC = () => {
       console.error('Failed to load tasks:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadBacklogSummary = async () => {
+    try {
+      const summary = await api.tasks.getUnfinishedSummary(weekInfo.mondayStr);
+      setUnfinishedSummary(summary);
+    } catch (err) {
+      console.error('Failed to load backlog summary:', err);
     }
   };
 
@@ -166,16 +193,44 @@ export const TasksPage: React.FC = () => {
 
   useEffect(() => {
     loadTasks();
-  }, [search, dateFilter, selectedGoalId, selectedStatus, selectedDifficulty, selectedPriority]);
+    loadBacklogSummary();
+  }, [
+    currentWeekDate,
+    isAllWeeksMode,
+    search,
+    dateFilter,
+    selectedGoalId,
+    selectedStatus,
+    selectedDifficulty,
+    selectedPriority,
+  ]);
 
   const handleToggleStatus = async (task: Task) => {
     try {
       const newStatus = task.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
-      await api.tasks.update(task.id, { status: newStatus });
+      await api.tasks.update(task.id, {
+        status: newStatus,
+        completed_datetime: newStatus === 'COMPLETED' ? new Date().toISOString() : null,
+      });
       loadTasks();
+      loadBacklogSummary();
       window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
     } catch (err) {
       console.error('Failed to toggle task status:', err);
+    }
+  };
+
+  const handleChangeStatus = async (task: Task, newStatus: TaskStatus) => {
+    try {
+      await api.tasks.update(task.id, {
+        status: newStatus,
+        completed_datetime: newStatus === 'COMPLETED' ? new Date().toISOString() : null,
+      });
+      loadTasks();
+      loadBacklogSummary();
+      window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
+    } catch (err) {
+      console.error('Failed to update task status:', err);
     }
   };
 
@@ -194,6 +249,7 @@ export const TasksPage: React.FC = () => {
       try {
         await api.tasks.delete(taskId);
         loadTasks();
+        loadBacklogSummary();
         window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
       } catch (err) {
         console.error('Failed to delete task:', err);
@@ -209,9 +265,30 @@ export const TasksPage: React.FC = () => {
         await api.tasks.create(taskData);
       }
       loadTasks();
+      loadBacklogSummary();
       window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
     } catch (err) {
       console.error('Failed to save task:', err);
+    }
+  };
+
+  const handleQuickCreateInExcel = async (title: string) => {
+    try {
+      // Due date defaults to 21:00 of today or the week's Monday
+      const todayStr = toLocalDateString();
+      const defaultDueDate = `${todayStr}T21:00:00`;
+      await api.tasks.create({
+        title,
+        status: 'TODO',
+        priority: 'MEDIUM',
+        difficulty: 2,
+        due_datetime: defaultDueDate,
+        goal_id: selectedGoalId,
+      });
+      loadTasks();
+      window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
+    } catch (err) {
+      console.error('Failed to quick create task in Excel table:', err);
     }
   };
 
@@ -228,9 +305,27 @@ export const TasksPage: React.FC = () => {
         notes,
       });
       loadTasks();
+      loadBacklogSummary();
       window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
     } catch (err) {
       console.error('Failed to transfer task:', err);
+    }
+  };
+
+  // Rollover all unfinished tasks from past weeks to current week
+  const handleRolloverAll = async () => {
+    setIsRollingOver(true);
+    try {
+      const res = await api.tasks.rolloverPast(weekInfo.mondayStr);
+      setIsBacklogModalOpen(false);
+      loadTasks();
+      loadBacklogSummary();
+      window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
+    } catch (err) {
+      console.error('Failed to rollover past tasks:', err);
+      alert('Không thể dời nhiệm vụ: ' + String(err));
+    } finally {
+      setIsRollingOver(false);
     }
   };
 
@@ -267,6 +362,9 @@ export const TasksPage: React.FC = () => {
       else if (!a.due_datetime) diff = 1;
       else if (!b.due_datetime) diff = -1;
       else diff = new Date(a.due_datetime).getTime() - new Date(b.due_datetime).getTime();
+    } else if (sortBy === 'STATUS') {
+      const sMap: Record<string, number> = { DELAYED: 5, IN_PROGRESS: 4, PARTIAL: 3, TODO: 2, TRANSFERRED: 1, COMPLETED: 0 };
+      diff = (sMap[b.status] || 0) - (sMap[a.status] || 0);
     } else if (sortBy === 'PRIORITY') {
       const pMap: Record<string, number> = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
       diff = (pMap[b.priority] || 0) - (pMap[a.priority] || 0);
@@ -461,7 +559,7 @@ export const TasksPage: React.FC = () => {
         { code: 'PARTIAL', label: 'Hoàn thành một phần', icon: '🌓' },
         { code: 'DELAYED', label: 'Chậm trễ', icon: '🔴' },
         { code: 'COMPLETED', label: 'Đã hoàn thành', icon: '✅' },
-        { code: 'TRANSFERRED', label: 'Đã chuyển giao', icon: '↪️' },
+        { code: 'TRANSFERRED', label: 'Đã chuyển tiếp', icon: '↪️' },
       ];
 
       const groups: TaskGroup[] = [];
@@ -630,16 +728,9 @@ export const TasksPage: React.FC = () => {
     { id: 'COMPLETED', label: 'Đã hoàn thành' },
   ];
 
-  const totalCompletedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
-  const overallTaskProgress = tasks.length > 0 ? Math.round((totalCompletedTasks / tasks.length) * 100) : 0;
+  const totalCompletedTasks = filteredTasks.filter((t) => t.status === 'COMPLETED').length;
+  const overallTaskProgress = filteredTasks.length > 0 ? Math.round((totalCompletedTasks / filteredTasks.length) * 100) : 0;
 
-  // Pinned Goals and Deadlines Showcase list
-  const pinnedGoalsAndCountdowns = useMemo(() => {
-    const pinned = countdowns.filter((c) => c.is_pinned);
-    if (pinned.length > 0) return pinned;
-    // Fallback to top goals or countdowns
-    return countdowns.filter((c) => c.category === 'GOAL' || c.category === 'EXAM').slice(0, 4);
-  }, [countdowns]);
 
   return (
     <div className="space-y-4">
@@ -653,7 +744,7 @@ export const TasksPage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Quản lý công việc tập trung, liên kết mục tiêu và theo dõi tiến độ tinh giản
+            Quản lý công việc dạng bảng tính Excel trực quan, view theo tuần và cảnh báo tồn đọng thông minh
           </p>
         </div>
 
@@ -671,110 +762,117 @@ export const TasksPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Top Goal Strip ("Mục tiêu & Hạn chót trọng tâm") - ĐẨY MỤC TIÊU LÊN ĐẦU VỚI HÀO QUANG TOẢ RA XUNG QUANH */}
-      {pinnedGoalsAndCountdowns.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xs space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🎯</span>
-              <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                Mục tiêu trọng tâm & Đếm ngược
-              </h3>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                {countdowns.filter((c) => c.is_pinned).length > 0 ? 'Đã ghim' : 'Ưu tiên'}
-              </span>
+      {/* 2. Weekly Navigation Bar ("view theo tuần, tuần mới thì task mất đi") */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2.5 px-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Week Navigator */}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 p-0.5 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setCurrentWeekDate(addWeeks(currentWeekDate, -1))}
+              className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition"
+              title="Tuần trước"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="px-3 py-1 flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-100">
+              <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{isAllWeeksMode ? 'Tất cả các tuần' : weekInfo.label}</span>
             </div>
-
-            {selectedGoalId && (
-              <button
-                type="button"
-                onClick={() => setSelectedGoalId(undefined)}
-                className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
-              >
-                <X className="w-3 h-3" />
-                <span>Xóa lọc mục tiêu</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setCurrentWeekDate(addWeeks(currentWeekDate, 1))}
+              className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition"
+              title="Tuần sau"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {pinnedGoalsAndCountdowns.map((item) => {
-              const isPinned = item.is_pinned;
-              const targetD = new Date(item.target_date);
-              const nowMs = Date.now();
-              const targetMs = targetD.getTime();
-              const diffDays = Math.ceil((targetMs - nowMs) / (1000 * 60 * 60 * 24));
-              const isSelected =
-                selectedGoalId !== undefined &&
-                goals.find((g) => g.id === selectedGoalId)?.title.toLowerCase() === item.title.toLowerCase();
+          {/* Jump to Current Week button if not viewing current week */}
+          {!isCurrentCalendarWeek && !isAllWeeksMode && (
+            <button
+              type="button"
+              onClick={() => setCurrentWeekDate(new Date())}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition shadow-2xs"
+            >
+              Về tuần hiện tại
+            </button>
+          )}
+        </div>
 
-              return (
-                <div key={item.id} className="relative group">
-                  {/* HÀO QUANG TOẢ XUNG QUANH LIÊN TỤC KHI MỤC TIÊU ĐƯỢC GHIM */}
-                  {isPinned && (
-                    <div
-                      className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 opacity-75 blur-md animate-pinned-aura pointer-events-none z-0"
-                      aria-hidden="true"
-                    />
-                  )}
+        {/* Right: Week Filter Mode Switcher */}
+        <div className="flex items-center gap-1.5">
+          <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100/60 dark:bg-slate-800/60 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setIsAllWeeksMode(false)}
+              className={`px-3 py-1 rounded-lg font-semibold transition ${
+                !isAllWeeksMode
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'
+              }`}
+              title="Chỉ hiển thị các nhiệm vụ thuộc tuần đang chọn"
+            >
+              Theo tuần này
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAllWeeksMode(true)}
+              className={`px-3 py-1 rounded-lg font-semibold transition ${
+                isAllWeeksMode
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'
+              }`}
+              title="Xem tất cả nhiệm vụ trên toàn hệ thống"
+            >
+              Tất cả tuần
+            </button>
+          </div>
+        </div>
+      </div>
 
-                  <div
-                    onClick={() => {
-                      const match = goals.find((g) => g.title.toLowerCase() === item.title.toLowerCase());
-                      if (match) {
-                        setSelectedGoalId(selectedGoalId === match.id ? undefined : match.id);
-                      } else {
-                        setSearch(search === item.title ? '' : item.title);
-                      }
-                    }}
-                    className={`cursor-pointer rounded-xl p-3 border transition-all relative z-10 flex flex-col justify-between ${
-                      isPinned
-                        ? 'ring-2 ring-amber-400/90 bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-700 shadow-sm'
-                        : 'bg-slate-50/80 dark:bg-slate-850/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                    } ${isSelected ? 'ring-2 ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30' : ''}`}
-                  >
-                    <div className="flex items-start justify-between gap-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-lg shrink-0">{item.icon || '🎯'}</span>
-                        <div className="min-w-0">
-                          <h4
-                            className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate"
-                            title={item.title}
-                          >
-                            {item.title}
-                          </h4>
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                            {item.category === 'EXAM' ? 'Ngày thi' : item.category === 'GOAL' ? 'Mục tiêu' : 'Sự kiện'}
-                          </span>
-                        </div>
-                      </div>
+      {/* 3. Unfinished Past Tasks Alert Banner ("tuần nào chưa xong thì sẽ báo lại") */}
+      {unfinishedSummary && unfinishedSummary.total_unfinished > 0 && !isAllWeeksMode && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs animate-in fade-in duration-300">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-200/80 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 shadow-2xs">
+              <AlertTriangle className="w-4 h-4 text-amber-600 animate-bounce" />
+            </div>
+            <div>
+              <span className="font-extrabold text-amber-950 dark:text-amber-100 text-xs sm:text-sm">
+                Báo cáo việc tồn đọng: Bạn còn {unfinishedSummary.total_unfinished} nhiệm vụ chưa hoàn tất từ các tuần trước!
+              </span>
+              <p className="text-[11px] text-amber-800 dark:text-amber-300/90 mt-0.5">
+                Các công việc này chưa hoàn thành ở tuần cũ. Bạn có thể dời tất cả sang {weekInfo.label} để tiếp tục theo dõi và giải quyết.
+              </p>
+            </div>
+          </div>
 
-                      {isPinned && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-400 text-neutral-950 border border-amber-300 shadow-2xs font-mono shrink-0">
-                          <Pin className="w-2.5 h-2.5 fill-neutral-950" />
-                          <span>GHIM</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
-                      <span className="font-semibold text-slate-600 dark:text-slate-400">
-                        {diffDays > 0 ? `Còn ${diffDays} ngày` : diffDays === 0 ? 'Hôm nay!' : 'Đã diễn ra'}
-                      </span>
-                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold group-hover:underline">
-                        {isSelected ? 'Đang lọc ✓' : 'Lọc việc →'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => setIsBacklogModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-bold hover:bg-amber-100/60 dark:hover:bg-slate-700 transition shadow-2xs"
+            >
+              Xem chi tiết ({unfinishedSummary.total_unfinished})
+            </button>
+            <button
+              type="button"
+              onClick={handleRolloverAll}
+              disabled={isRollingOver}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-extrabold flex items-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{isRollingOver ? 'Đang dời...' : 'Dời sang tuần này'}</span>
+            </button>
           </div>
         </div>
       )}
 
-      {/* 3. Streamlined Single Control Bar (Loại bỏ hoàn toàn rối rắm từ 3 thanh công cụ cũ) */}
+      {/* 4. Streamlined Unified Control Bar */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-xs space-y-2.5">
+
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
           {/* Left: Search input */}
           <div className="relative flex-1 min-w-[220px]">
@@ -804,7 +902,7 @@ export const TasksPage: React.FC = () => {
                 key={pill.id}
                 type="button"
                 onClick={() => setDateFilter(pill.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   dateFilter === pill.id
                     ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs'
                     : 'bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/70 dark:hover:bg-slate-700/70 text-slate-600 dark:text-slate-300'
@@ -815,30 +913,45 @@ export const TasksPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Right: Layout Switcher, Sort & Filter Drawer Button */}
+          {/* Right: Layout Switcher (EXCEL, CARDS, ROWS), Sort & Filter Drawer Button */}
           <div className="flex items-center gap-1.5 shrink-0 self-end lg:self-center">
-            {/* View Layout Toggle: Board vs Rows */}
+            {/* 3-View Layout Switcher */}
             <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100/60 dark:bg-slate-800/60 p-0.5">
               <button
                 type="button"
-                onClick={() => setViewLayout('CARDS')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                  viewLayout === 'CARDS'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                onClick={() => setViewLayout('EXCEL')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                  viewLayout === 'EXCEL'
+                    ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
-                title="Bảng cột trạng thái (Kanban)"
+                title="Bảng tính Excel trạng thái cột"
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Excel</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewLayout('CARDS')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                  viewLayout === 'CARDS'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+                title="Bảng cột Kanban"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Bảng cột</span>
+                <span className="hidden sm:inline">Kanban</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => setViewLayout('ROWS')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                   viewLayout === 'ROWS'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
                 title="Danh sách hàng phân lớp"
               >
@@ -855,6 +968,7 @@ export const TasksPage: React.FC = () => {
                 className="bg-transparent font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer pr-1"
               >
                 <option value="DUE">Hạn chót</option>
+                <option value="STATUS">Trạng thái</option>
                 <option value="PRIORITY">Ưu tiên</option>
                 <option value="DIFFICULTY">Độ khó</option>
                 <option value="CREATED">Mới nhất</option>
@@ -863,7 +977,7 @@ export const TasksPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC')}
-                className="p-0.5 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+                className="p-0.5 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
                 title={sortOrder === 'ASC' ? 'Tăng dần (Bấm để đảo chiều)' : 'Giảm dần (Bấm để đảo chiều)'}
               >
                 {sortOrder === 'ASC' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3 text-amber-500" />}
@@ -874,7 +988,7 @@ export const TasksPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsFilterDrawerOpen(!isFilterDrawerOpen)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all ${
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
                 isFilterDrawerOpen || activeSecondaryFilterCount > 0
                   ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 shadow-2xs'
                   : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
@@ -898,7 +1012,7 @@ export const TasksPage: React.FC = () => {
             <select
               value={selectedCourseId || ''}
               onChange={(e) => setSelectedCourseId(e.target.value ? Number(e.target.value) : undefined)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="">📚 Tất cả môn / khóa học</option>
               {courses.map((c) => (
@@ -912,7 +1026,7 @@ export const TasksPage: React.FC = () => {
             <select
               value={selectedGoalId || ''}
               onChange={(e) => setSelectedGoalId(e.target.value ? Number(e.target.value) : undefined)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="">🎯 Tất cả mục tiêu</option>
               {goals.map((g) => (
@@ -926,7 +1040,7 @@ export const TasksPage: React.FC = () => {
             <select
               value={selectedPriority}
               onChange={(e) => setSelectedPriority(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="ALL">⚡ Mức ưu tiên</option>
               <option value="URGENT">Khẩn cấp</option>
@@ -939,7 +1053,7 @@ export const TasksPage: React.FC = () => {
             <select
               value={selectedDifficulty || ''}
               onChange={(e) => setSelectedDifficulty(e.target.value ? Number(e.target.value) : undefined)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="">🔥 Độ khó (XP)</option>
               <option value={1}>Dễ (+1 XP)</option>
@@ -956,7 +1070,7 @@ export const TasksPage: React.FC = () => {
                 <select
                   value={groupBy}
                   onChange={(e: any) => setGroupBy(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="COURSE">Khóa học / Môn</option>
                   <option value="TIME">Thời gian hạn chót</option>
@@ -972,7 +1086,7 @@ export const TasksPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-semibold text-xs flex items-center gap-1 transition ml-auto"
+                className="px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-semibold text-xs flex items-center gap-1 transition ml-auto cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Đặt lại bộ lọc</span>
@@ -982,27 +1096,77 @@ export const TasksPage: React.FC = () => {
         )}
       </div>
 
-      {/* 4. Task Content (Kanban Board vs Layered Rows) */}
+      {/* 6. Main Task Content Render: EXCEL, KANBAN, or ROWS */}
       {isLoading ? (
         <div className="p-12 text-center text-slate-500 text-xs animate-pulse">
           Đang tải danh sách nhiệm vụ...
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="p-12 text-center bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
-          <p className="text-slate-700 dark:text-slate-400 text-sm font-medium">Không tìm thấy nhiệm vụ nào phù hợp</p>
-          <p className="text-slate-500 text-xs mt-1">
-            Hãy thử đổi bộ lọc hoặc bấm "Tạo nhiệm vụ mới" ở góc trên
+        <div className="p-12 text-center bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs space-y-2">
+          <p className="text-slate-700 dark:text-slate-300 text-sm font-semibold">
+            Không tìm thấy nhiệm vụ nào trong {isAllWeeksMode ? 'toàn bộ thời gian' : weekInfo.label}
           </p>
+          <p className="text-slate-500 text-xs">
+            Tuần mới bắt đầu sạch sẽ! Hãy bấm "Tạo nhiệm vụ mới" hoặc dời nhiệm vụ từ tuần trước sang.
+          </p>
+          <div className="pt-2 flex justify-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setTaskToEdit(null);
+                setIsTaskModalOpen(true);
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Thêm nhiệm vụ cho tuần này</span>
+            </Button>
+            {unfinishedSummary && unfinishedSummary.total_unfinished > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBacklogModalOpen(true)}
+                className="border-amber-300 text-amber-800 dark:text-amber-300"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <span>Xem {unfinishedSummary.total_unfinished} việc tuần cũ</span>
+              </Button>
+            )}
+          </div>
         </div>
+      ) : viewLayout === 'EXCEL' ? (
+        /* ================= 1. EXCEL SPREADSHEET GRID VIEW ================= */
+        <TaskExcelTable
+          tasks={sortedAllTasks}
+          onToggleStatus={handleToggleStatus}
+          onChangeStatus={handleChangeStatus}
+          onEdit={(task) => {
+            setTaskToEdit(task);
+            setIsTaskModalOpen(true);
+          }}
+          onTransfer={(task) => setTaskToTransfer(task)}
+          onDelete={handleDeleteTask}
+          onToggleSubtask={handleToggleSubtask}
+          onQuickCreate={handleQuickCreateInExcel}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortChange={(field) => {
+            if (sortBy === field) {
+              setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+            } else {
+              setSortBy(field as SortByMode);
+              setSortOrder('ASC');
+            }
+          }}
+        />
       ) : viewLayout === 'CARDS' ? (
-        /* Unified 4-Column Status Kanban Board */
+        /* ================= 2. UNIFIED KANBAN BOARD VIEW ================= */
         <div className="w-full">
           {renderStatusBoard(sortedAllTasks)}
         </div>
       ) : (
-        /* Layered Group Sections in Rows View */
+        /* ================= 3. LAYERED ACCORDION ROWS VIEW ================= */
         <div className="space-y-4">
-          {/* Header controls for expand/collapse */}
           {groupBy !== 'NONE' && groupedTasks.length > 1 && (
             <div className="flex justify-end">
               <button
@@ -1011,7 +1175,7 @@ export const TasksPage: React.FC = () => {
                   const isAnyCollapsed = Object.values(collapsedGroups).some((v) => v);
                   handleToggleCollapseAll(!isAnyCollapsed);
                 }}
-                className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 text-xs font-semibold px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 transition"
+                className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 text-xs font-semibold px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 transition cursor-pointer"
               >
                 {Object.values(collapsedGroups).some((v) => v) ? 'Mở rộng tất cả nhóm' : 'Thu gọn tất cả nhóm'}
               </button>
@@ -1084,7 +1248,7 @@ export const TasksPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modals */}
+      {/* 7. Modals */}
       <TaskModal
         isOpen={isTaskModalOpen}
         onClose={() => {
@@ -1103,6 +1267,23 @@ export const TasksPage: React.FC = () => {
         task={taskToTransfer}
         onClose={() => setTaskToTransfer(null)}
         onConfirm={handleConfirmTransfer}
+      />
+
+      {/* Backlog Review & Rollover Modal */}
+      <TaskBacklogModal
+        isOpen={isBacklogModalOpen}
+        onClose={() => setIsBacklogModalOpen(false)}
+        pastWeeks={unfinishedSummary?.past_weeks || []}
+        totalUnfinished={unfinishedSummary?.total_unfinished || 0}
+        onRolloverAll={handleRolloverAll}
+        onToggleStatus={handleToggleStatus}
+        onTransferIndividual={(task) => {
+          setIsBacklogModalOpen(false);
+          setTaskToTransfer(task);
+        }}
+        onDeleteTask={handleDeleteTask}
+        isRollingOver={isRollingOver}
+        currentWeekLabel={weekInfo.label}
       />
     </div>
   );

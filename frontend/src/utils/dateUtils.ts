@@ -71,3 +71,57 @@ export const formatDatetimeForBackend = (val?: string | null): string | undefine
 // Aliases for compatibility
 export const isoToLocalInput = parseBackendDatetimeToLocalInput;
 export const localInputToISO = formatDatetimeForBackend;
+
+/**
+ * Returns Monday, Sunday, ISO week number, and formatted label for any given date.
+ */
+export const getWeekDateRange = (d: Date = new Date()) => {
+  const current = new Date(d.getTime());
+  const day = current.getDay();
+  // day 0 is Sunday, 1 is Monday ... 6 is Saturday
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(current);
+  monday.setDate(current.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  // ISO week calculation
+  const target = new Date(monday.valueOf());
+  const dayNr = (monday.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
+  }
+  const weekNumber = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const monStr = `${pad2(monday.getDate())}/${pad2(monday.getMonth() + 1)}`;
+  const sunStr = `${pad2(sunday.getDate())}/${pad2(sunday.getMonth() + 1)}/${sunday.getFullYear()}`;
+  const label = `Tuần ${weekNumber} (${monStr} - ${sunStr})`;
+
+  return {
+    monday,
+    sunday,
+    mondayStr: toLocalDateString(monday),
+    sundayStr: toLocalDateString(sunday),
+    weekNumber,
+    year: monday.getFullYear(),
+    label,
+    shortRange: `${monStr} - ${sunStr}`,
+  };
+};
+
+/**
+ * Add or subtract weeks from a date.
+ */
+export const addWeeks = (d: Date, numWeeks: number): Date => {
+  const res = new Date(d.getTime());
+  res.setDate(res.getDate() + numWeeks * 7);
+  return res;
+};
+

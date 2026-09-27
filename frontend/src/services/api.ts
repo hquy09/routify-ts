@@ -5,6 +5,10 @@ import {
   HeaderSummary, DisciplineRatingConfig, BurnoutAnalysisOut, BurnoutCustomConfig,
   GlobalWellbeingAnalysis, WellbeingCustomConfig, TensionSummary
 } from '../types';
+import {
+  WorkoutLog, WorkoutLogInput, FitnessProfile, FitnessProfileInput,
+  FitnessWeeklyPlan, FitnessSummary
+} from '../types/fitness';
 
 const BASE_URL = '/api';
 
@@ -49,6 +53,9 @@ export const api = {
       priority?: string;
       date_filter?: string;
       search?: string;
+      week_date?: string;
+      start_date?: string;
+      end_date?: string;
     }) => {
       const q = new URLSearchParams();
       if (params) {
@@ -57,6 +64,30 @@ export const api = {
         });
       }
       return request<Task[]>(`/tasks?${q.toString()}`);
+    },
+    getUnfinishedSummary: (refDate?: string) => {
+      const q = refDate ? `?ref_date=${refDate}` : '';
+      return request<{
+        total_unfinished: number;
+        current_week_start: string;
+        past_weeks: Array<{
+          week_key: string;
+          week_number: number;
+          year: number;
+          label: string;
+          tasks: Task[];
+        }>;
+        tasks: Task[];
+      }>(`/tasks/backlog/unfinished-summary${q}`);
+    },
+    rolloverPast: (targetDate?: string) => {
+      const q = targetDate ? `?target_date=${targetDate}` : '';
+      return request<{
+        success: boolean;
+        rolled_count: number;
+        target_date: string;
+        message: string;
+      }>(`/tasks/backlog/rollover-past${q}`, { method: 'POST' });
     },
     get: (id: number) => request<Task>(`/tasks/${id}`),
     create: (data: Partial<Task> & { subtask_titles?: string[] }) =>
@@ -472,4 +503,35 @@ export const api = {
         method: 'POST',
       }),
   },
+
+  // Fitness & Sports (Sức khỏe & Thể thao, Gym, Chạy bộ, Calo, Nước uống, Lịch tập)
+  fitness: {
+    getSummary: (refDate?: string) =>
+      request<FitnessSummary>(`/fitness/summary${refDate ? `?ref_date=${encodeURIComponent(refDate)}` : ''}`),
+    getProfile: () => request<FitnessProfile>('/fitness/profile'),
+    updateProfile: (data: FitnessProfileInput) =>
+      request<FitnessProfile>('/fitness/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    addWater: (amount_ml: number) =>
+      request<FitnessProfile>('/fitness/water/add', { method: 'POST', body: JSON.stringify({ amount_ml }) }),
+    listLogs: (params?: { workout_type?: string; start_date?: string; end_date?: string; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.workout_type) q.append('workout_type', params.workout_type);
+      if (params?.start_date) q.append('start_date', params.start_date);
+      if (params?.end_date) q.append('end_date', params.end_date);
+      if (params?.limit) q.append('limit', params.limit.toString());
+      return request<WorkoutLog[]>(`/fitness/logs${q.toString() ? `?${q.toString()}` : ''}`);
+    },
+    createLog: (data: WorkoutLogInput) =>
+      request<WorkoutLog>('/fitness/logs', { method: 'POST', body: JSON.stringify(data) }),
+    updateLog: (id: number, data: Partial<WorkoutLogInput>) =>
+      request<WorkoutLog>(`/fitness/logs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteLog: (id: number) =>
+      request<{ message: string }>(`/fitness/logs/${id}`, { method: 'DELETE' }),
+    getWeeklyPlans: () => request<FitnessWeeklyPlan[]>('/fitness/weekly-plans'),
+    updateWeeklyPlans: (plans: FitnessWeeklyPlan[]) =>
+      request<FitnessWeeklyPlan[]>('/fitness/weekly-plans', { method: 'PUT', body: JSON.stringify({ plans }) }),
+    toggleWeeklyPlan: (id: number) =>
+      request<FitnessWeeklyPlan>(`/fitness/weekly-plans/${id}/toggle`, { method: 'POST' }),
+  },
 };
+

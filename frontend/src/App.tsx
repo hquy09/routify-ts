@@ -9,6 +9,7 @@ import { ArchivePage } from './pages/ArchivePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ScreenTimePage } from './pages/ScreenTimePage';
 import { MentalHealthPage } from './pages/MentalHealthPage';
+import { FitnessPage } from './pages/FitnessPage';
 import { CommandPalette } from './components/command/CommandPalette';
 import { TaskModal } from './components/tasks/TaskModal';
 import { SystemLegendModal } from './components/common/SystemLegendModal';
@@ -18,7 +19,7 @@ import { AutoUpdateModal } from './components/common/AutoUpdateModal';
 import { Goal, HeaderSummary } from './types';
 import { api } from './services/api';
 
-const CURRENT_APP_VERSION = '27.9.6';
+const CURRENT_APP_VERSION = '28.9.6';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -200,6 +201,7 @@ export function App() {
           {currentTab === 'calendar' && <CalendarPage />}
           {currentTab === 'tasks' && <TasksPage />}
           {currentTab === 'courses' && <CoursesPage onNavigateTab={(tab) => setCurrentTab(tab as NavTab)} />}
+          {currentTab === 'fitness' && <FitnessPage />}
           {currentTab === 'wellbeing' && <MentalHealthPage onNavigateTab={(tab) => setCurrentTab(tab as NavTab)} />}
           {currentTab === 'dashboard' && <DashboardPage />}
           {currentTab === 'screentime' && <ScreenTimePage />}

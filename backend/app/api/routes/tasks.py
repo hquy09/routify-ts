@@ -23,15 +23,33 @@ def list_tasks(
     search: Optional[str] = Query(None),
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    week_date: Optional[str] = Query(None, description="ISO Date YYYY-MM-DD for week view"),
+    start_date: Optional[str] = Query(None, description="ISO Date YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="ISO Date YYYY-MM-DD"),
     db: Session = Depends(get_database)
 ):
     return TaskService.list_tasks(
-        db, status, goal_id, project_id, course_node_id, difficulty, priority, date_filter, search, limit, offset
+        db, status, goal_id, project_id, course_node_id, difficulty, priority, date_filter, search, limit, offset,
+        week_date, start_date, end_date
     )
 
 @router.post("", response_model=TaskOut)
 def create_task(task_in: TaskCreate, db: Session = Depends(get_database)):
     return TaskService.create_task(db, task_in)
+
+@router.get("/backlog/unfinished-summary")
+def get_unfinished_past_summary(
+    ref_date: Optional[str] = Query(None, description="ISO Date YYYY-MM-DD for reference current week"),
+    db: Session = Depends(get_database)
+):
+    return TaskService.get_unfinished_past_summary(db, ref_date)
+
+@router.post("/backlog/rollover-past")
+def rollover_past_tasks(
+    target_date: Optional[str] = Query(None, description="ISO Date YYYY-MM-DD to rollover tasks to"),
+    db: Session = Depends(get_database)
+):
+    return TaskService.rollover_past_tasks(db, target_date)
 
 @router.get("/{task_id}", response_model=TaskOut)
 def get_task(task_id: int, db: Session = Depends(get_database)):

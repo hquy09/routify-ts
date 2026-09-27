@@ -15,17 +15,46 @@ from app.services.gdrive_service import create_local_safety_backup, log_sync_eve
 # Root directory of the application partition (c:\Users\Huu Quy\Pictures\lifeos)
 APP_ROOT_DIR = BASE_DIR.parent
 
-CURRENT_APP_VERSION = "27.9.6"
+CURRENT_APP_VERSION = "28.9.6"
 CURRENT_COMMIT_HASH = "c64b8ba"
-RELEASE_DATE = "2026-09-27"
+RELEASE_DATE = "2026-09-28"
 
 CHANGELOG_HISTORY = [
+    {
+        "version": "28.9.6",
+        "date": "28/09/2026",
+        "commit_hash": "c64b8ba",
+        "title": "Bản Phát Hành v28.9.6: Ra Mắt Chuyên Mục Sức Khỏe & Thể Thao & Tinh Giản Không Gian",
+        "is_latest": True,
+        "highlights": [
+            {
+                "category": "Sức khỏe & Thể thao (Gym, Chạy bộ)",
+                "icon": "🏋️‍♂️",
+                "content": "Ra mắt chuyên mục Sức khỏe & Thể thao hoàn chỉnh: Theo dõi chi tiết các buổi tập Gym, chạy bộ, đạp xe, bơi lội, thể thao; ước tính calo đốt cháy, cự ly km và chuỗi kỷ luật rèn luyện."
+            },
+            {
+                "category": "Chỉ số thể trạng & BMI",
+                "icon": "⚖️",
+                "content": "Tự động tính toán chỉ số BMI từ chiều cao và cân nặng, xếp loại thể trạng theo chuẩn y khoa WHO và cài đặt mục tiêu cân nặng lý tưởng."
+            },
+            {
+                "category": "Lịch tập tuần & Uống nước",
+                "icon": "💧",
+                "content": "Lịch phân chia nhóm cơ hàng tuần (Weekly Split 7 ngày) từ Thứ 2 đến Chủ Nhật kèm bộ theo dõi lượng nước uống hàng ngày với nút nạp nhanh +250ml/+500ml."
+            },
+            {
+                "category": "Tinh giản không gian",
+                "icon": "✨",
+                "content": "Dỡ bỏ các thanh mục tiêu trọng tâm chiếm diện tích trên trang Nhiệm vụ và Dashboard, tập trung 100% vào Bảng tính Excel và biểu đồ hiệu suất."
+            }
+        ]
+    },
     {
         "version": "27.9.6",
         "date": "27/09/2026",
         "commit_hash": "c64b8ba",
         "title": "Bản Phát Hành v27.9.6 (Commit c64b8ba)",
-        "is_latest": True,
+        "is_latest": False,
         "highlights": [
             {
                 "category": "Cập nhật từ GitHub",

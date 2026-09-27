@@ -17,13 +17,14 @@ import {
   Maximize2,
   Minimize2,
   Sparkles,
-  FolderSync
+  FolderSync,
+  Dumbbell
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
 import { isMentalHealthEnabled } from '../../utils/featureFlags';
 
-export type NavTab = 'dashboard' | 'calendar' | 'tasks' | 'courses' | 'wellbeing' | 'screentime' | 'archive' | 'settings';
+export type NavTab = 'dashboard' | 'calendar' | 'tasks' | 'courses' | 'fitness' | 'wellbeing' | 'screentime' | 'archive' | 'settings';
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -59,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'calendar', label: 'Lịch biểu', icon: <CalendarIcon className="w-4 h-4 shrink-0" /> },
     { id: 'tasks', label: 'Nhiệm vụ', icon: <CheckSquare className="w-4 h-4 shrink-0" /> },
     { id: 'courses', label: 'Khóa học', icon: <BookOpen className="w-4 h-4 shrink-0" /> },
+    { id: 'fitness', label: 'Sức khỏe & Thể thao', icon: <Dumbbell className="w-4 h-4 shrink-0 text-emerald-500" /> },
     ...(isMentalHealthOn
       ? [{ id: 'wellbeing' as NavTab, label: 'Sức khỏe tinh thần', icon: <HeartPulse className="w-4 h-4 shrink-0 text-rose-500" /> }]
       : []),
@@ -107,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Routify
                 </span>
                 <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-600 dark:text-indigo-400 select-none shrink-0 shadow-2xs font-mono">
-                  v27.9.6
+                  v28.9.6
                 </span>
               </div>
             )}
@@ -245,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onOpenChangelog}
                 className="w-8 h-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs transition cursor-pointer"
-                title="Nhật ký cập nhật (Changelog v27.9.6)"
+                title="Nhật ký cập nhật (Changelog v28.9.6)"
               >
                 <Sparkles className="w-4 h-4 text-amber-500" />
               </button>
@@ -298,9 +300,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     onClick={onOpenChangelog}
                     className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono text-[10px] font-bold hover:bg-indigo-200 transition cursor-pointer"
-                    title="Xem nhật ký cập nhật (Changelog v27.9.6)"
+                    title="Xem nhật ký cập nhật (Changelog v28.9.6)"
                   >
-                    v27.9.6
+                    v28.9.6
                   </button>
                 )}
               </div>

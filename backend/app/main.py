@@ -7,7 +7,7 @@ from app.database.session import engine, SessionLocal
 from app.models import Base
 from app.api.routes import (
     tasks, goals, schedules, courses, calendar, dashboard, archive, search, attachments,
-    settings as settings_routes, screentime, quotes, countdowns, telegram, wellbeing
+    settings as settings_routes, screentime, quotes, countdowns, telegram, wellbeing, fitness
 )
 from app.services.telegram_service import TelegramService
 
@@ -115,6 +115,7 @@ app.include_router(quotes.router, prefix=f"{settings.API_V1_STR}/quotes", tags=[
 app.include_router(countdowns.router, prefix=f"{settings.API_V1_STR}/countdowns", tags=["Countdowns"])
 app.include_router(telegram.router, prefix=f"{settings.API_V1_STR}/telegram", tags=["Telegram Bot Notifications"])
 app.include_router(wellbeing.router, prefix=f"{settings.API_V1_STR}/wellbeing", tags=["Mental Health & Wellbeing"])
+app.include_router(fitness.router, prefix=f"{settings.API_V1_STR}/fitness", tags=["Fitness & Sports"])
 
 @app.get("/health")
 def health_check():

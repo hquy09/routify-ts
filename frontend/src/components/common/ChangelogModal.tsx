@@ -38,10 +38,42 @@ interface ChangelogModalProps {
 
 const DEFAULT_RELEASES: ChangelogRelease[] = [
   {
+    version: '28.9.6',
+    date: '28/09/2026',
+    title: 'Bản Phát Hành v28.9.6: Ra Mắt Chuyên Mục Sức Khỏe & Thể Thao & Tinh Giản Không Gian',
+    is_latest: true,
+    highlights: [
+      {
+        category: 'Sức Khỏe & Thể Thao',
+        icon: '🏋️‍♂️',
+        content:
+          'Chuyên mục Sức khỏe & Thể thao hoàn toàn mới: Ghi chép chi tiết các buổi tập Gym, chạy bộ, đạp xe, bơi lội, thể thao; tính toán calo tiêu thụ, quãng đường km và chuỗi ngày rèn luyện liên tiếp.',
+      },
+      {
+        category: 'Chỉ Số Thể Trạng & BMI',
+        icon: '⚖️',
+        content:
+          'Tự động tính toán chỉ số khối cơ thể (BMI) từ chiều cao và cân nặng, xếp loại thể trạng chuẩn WHO và theo dõi tiến trình giảm cân/tăng cơ.',
+      },
+      {
+        category: 'Lịch Tập Tuần & Uống Nước',
+        icon: '💧',
+        content:
+          'Phân bổ lịch tập 7 ngày trong tuần (Push/Pull/Legs, chạy bộ, ngày nghỉ ngơi) và bộ theo dõi lượng nước uống hàng ngày với nút nạp nhanh +250ml/+500ml.',
+      },
+      {
+        category: 'Tinh Giản Không Gian',
+        icon: '✨',
+        content:
+          'Xóa bỏ dải mục tiêu trọng tâm chiếm diện tích trên trang Nhiệm vụ và Dashboard, tập trung hoàn toàn vào Bảng tính Excel và biểu đồ hiệu suất.',
+      },
+    ],
+  },
+  {
     version: '27.9.6',
     date: '27/09/2026',
     title: 'Bản Phát Hành v27.9.6 (Commit c64b8ba)',
-    is_latest: true,
+    is_latest: false,
     highlights: [
       {
         category: 'Cập nhật từ GitHub',
@@ -133,7 +165,7 @@ export const ChangelogModal: React.FC<ChangelogModalProps> = ({
   isOpen,
   onClose,
   releases = DEFAULT_RELEASES,
-  currentVersion = '27.9.6',
+  currentVersion = '28.9.6',
   onOpenAutoUpdate,
 }) => {
   const [dontShowAgain, setDontShowAgain] = useState(true);

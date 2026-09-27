@@ -9,6 +9,7 @@ from app.models.analytics import WeeklyReview, ArchiveRecord
 from app.models.sync import AppSetting, SyncHistory
 from app.models.screentime import ScreenTimeLimit, ScreenTimeLog
 from app.models.countdown import Countdown
+from app.models.fitness import FitnessWorkoutLog, FitnessProfile, FitnessWeeklyPlan
 
 __all__ = [
     "Base",
@@ -29,4 +30,8 @@ __all__ = [
     "ScreenTimeLimit",
     "ScreenTimeLog",
     "Countdown",
+    "FitnessWorkoutLog",
+    "FitnessProfile",
+    "FitnessWeeklyPlan",
 ]
+

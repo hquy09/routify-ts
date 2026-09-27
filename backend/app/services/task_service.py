@@ -110,10 +110,13 @@ class TaskService:
         course_node_id: Optional[int] = None,
         difficulty: Optional[int] = None,
         priority: Optional[str] = None,
-        date_filter: Optional[str] = None,  # "TODAY", "UPCOMING", "DELAYED", "COMPLETED", "ALL"
+        date_filter: Optional[str] = None,  # "TODAY", "UPCOMING", "DELAYED", "COMPLETED", "THIS_WEEK", "BACKLOG", "ALL"
         search: Optional[str] = None,
         limit: int = 200,
-        offset: int = 0
+        offset: int = 0,
+        week_date: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> List[TaskOut]:
         query = db.query(Task).options(
             joinedload(Task.subtasks),
@@ -151,10 +154,64 @@ class TaskService:
         if priority:
             query = query.filter(Task.priority == priority)
 
-        if date_filter == "TODAY":
+        # 1. Week Date filter (Filters exact Monday to Sunday of the specified week date)
+        if week_date:
+            try:
+                ref = datetime.fromisoformat(week_date).date()
+                mon = ref - timedelta(days=ref.weekday())
+                sun = mon + timedelta(days=6)
+                week_start = datetime(mon.year, mon.month, mon.day, 0, 0, 0)
+                week_end = datetime(sun.year, sun.month, sun.day, 23, 59, 59)
+                query = query.filter(
+                    or_(
+                        and_(Task.due_datetime >= week_start, Task.due_datetime <= week_end),
+                        and_(Task.due_datetime.is_(None), Task.created_at >= week_start, Task.created_at <= week_end)
+                    )
+                )
+            except Exception:
+                pass
+        elif start_date or end_date:
+            if start_date:
+                try:
+                    s_d = datetime.fromisoformat(start_date)
+                    query = query.filter(or_(Task.due_datetime >= s_d, and_(Task.due_datetime.is_(None), Task.created_at >= s_d)))
+                except Exception:
+                    pass
+            if end_date:
+                try:
+                    e_d = datetime.fromisoformat(end_date)
+                    if len(end_date) <= 10:
+                        e_d = datetime(e_d.year, e_d.month, e_d.day, 23, 59, 59)
+                    query = query.filter(or_(Task.due_datetime <= e_d, and_(Task.due_datetime.is_(None), Task.created_at <= e_d)))
+                except Exception:
+                    pass
+        elif date_filter == "TODAY":
             query = query.filter(
                 Task.due_datetime >= today_start,
                 Task.due_datetime <= today_end
+            )
+        elif date_filter == "THIS_WEEK":
+            ref = now.date()
+            mon = ref - timedelta(days=ref.weekday())
+            sun = mon + timedelta(days=6)
+            week_start = datetime(mon.year, mon.month, mon.day, 0, 0, 0)
+            week_end = datetime(sun.year, sun.month, sun.day, 23, 59, 59)
+            query = query.filter(
+                or_(
+                    and_(Task.due_datetime >= week_start, Task.due_datetime <= week_end),
+                    and_(Task.due_datetime.is_(None), Task.created_at >= week_start, Task.created_at <= week_end)
+                )
+            )
+        elif date_filter == "BACKLOG":
+            ref = now.date()
+            mon = ref - timedelta(days=ref.weekday())
+            week_start = datetime(mon.year, mon.month, mon.day, 0, 0, 0)
+            query = query.filter(
+                Task.status.in_(["TODO", "IN_PROGRESS", "PARTIAL", "DELAYED"]),
+                or_(
+                    Task.due_datetime < week_start,
+                    and_(Task.due_datetime.is_(None), Task.created_at < week_start)
+                )
             )
         elif date_filter == "UPCOMING":
             query = query.filter(
@@ -362,3 +419,99 @@ class TaskService:
         db.delete(subtask)
         db.commit()
         return True
+
+    @classmethod
+    def get_unfinished_past_summary(cls, db: Session, ref_date_str: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Check for any unfinished tasks from weeks prior to the reference week.
+        Returns total count and tasks grouped by week.
+        """
+        now = datetime.now()
+        ref_date = datetime.fromisoformat(ref_date_str).date() if ref_date_str else now.date()
+        current_week_mon = ref_date - timedelta(days=ref_date.weekday())
+        current_week_start = datetime(current_week_mon.year, current_week_mon.month, current_week_mon.day, 0, 0, 0)
+
+        past_unfinished_tasks = db.query(Task).options(
+            joinedload(Task.subtasks),
+            joinedload(Task.attachments),
+            joinedload(Task.goal),
+            joinedload(Task.project),
+            joinedload(Task.course_node).joinedload(CourseNode.course),
+            joinedload(Task.scheduled_with_fixed),
+            joinedload(Task.transferred_from)
+        ).filter(
+            Task.status.in_(["TODO", "IN_PROGRESS", "PARTIAL", "DELAYED"]),
+            or_(
+                Task.due_datetime < current_week_start,
+                and_(Task.due_datetime.is_(None), Task.created_at < current_week_start)
+            )
+        ).order_by(Task.due_datetime.asc(), Task.created_at.asc()).all()
+
+        formatted_tasks = [cls._format_task_out(t) for t in past_unfinished_tasks]
+
+        weeks_map: Dict[str, Dict[str, Any]] = {}
+        for t in formatted_tasks:
+            dt = t.due_datetime or t.created_at
+            iso_year, iso_week, _ = dt.isocalendar()
+            w_key = f"{iso_year}-W{iso_week}"
+            if w_key not in weeks_map:
+                weeks_map[w_key] = {
+                    "week_key": w_key,
+                    "week_number": iso_week,
+                    "year": iso_year,
+                    "label": f"Tuần {iso_week} ({iso_year})",
+                    "tasks": []
+                }
+            weeks_map[w_key]["tasks"].append(t)
+
+        return {
+            "total_unfinished": len(formatted_tasks),
+            "current_week_start": current_week_start.isoformat(),
+            "past_weeks": list(weeks_map.values()),
+            "tasks": formatted_tasks
+        }
+
+    @classmethod
+    def rollover_past_tasks(cls, db: Session, target_date_str: Optional[str] = None, task_ids: Optional[List[int]] = None) -> Dict[str, Any]:
+        """
+        Rollover / transfer unfinished past tasks to the target date or today.
+        """
+        now = datetime.now()
+        target_dt = datetime.fromisoformat(target_date_str) if target_date_str else now
+        
+        query = db.query(Task).filter(
+            Task.status.in_(["TODO", "IN_PROGRESS", "PARTIAL", "DELAYED"])
+        )
+        if task_ids:
+            query = query.filter(Task.id.in_(task_ids))
+        else:
+            ref_date = now.date()
+            current_week_mon = ref_date - timedelta(days=ref_date.weekday())
+            current_week_start = datetime(current_week_mon.year, current_week_mon.month, current_week_mon.day, 0, 0, 0)
+            query = query.filter(
+                or_(
+                    Task.due_datetime < current_week_start,
+                    and_(Task.due_datetime.is_(None), Task.created_at < current_week_start)
+                )
+            )
+
+        tasks_to_roll = query.all()
+        rolled_count = 0
+        for t in tasks_to_roll:
+            hour = t.due_datetime.hour if t.due_datetime else 21
+            minute = t.due_datetime.minute if t.due_datetime else 0
+            new_due = datetime(target_dt.year, target_dt.month, target_dt.day, hour, minute, 0)
+            t.due_datetime = new_due
+            if t.status == "DELAYED":
+                t.status = "TODO"
+            t.updated_at = now
+            rolled_count += 1
+
+        db.commit()
+        return {
+            "success": True,
+            "rolled_count": rolled_count,
+            "target_date": target_dt.strftime("%Y-%m-%d"),
+            "message": f"Đã dời thành công {rolled_count} nhiệm vụ tồn đọng sang {target_dt.strftime('%d/%m/%Y')}."
+        }
+
