@@ -28,9 +28,14 @@ def main():
     kill_port(5173)
 
     # 2. Start Backend (FastAPI - must use python.exe, not pythonw.exe, for uvicorn)
-    py_exe = sys.executable
-    if py_exe.lower().endswith("pythonw.exe"):
-        py_exe = py_exe[:-5] + ".exe"
+    venv_py = os.path.join(BACKEND_DIR, ".venv", "Scripts", "python.exe")
+    if os.path.exists(venv_py):
+        py_exe = venv_py
+    else:
+        py_exe = sys.executable
+        if py_exe.lower().endswith("pythonw.exe"):
+            py_exe = py_exe[:-5] + ".exe"
+
     backend_cmd = [py_exe, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"]
     backend_proc = subprocess.Popen(
         backend_cmd,
