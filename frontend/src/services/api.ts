@@ -286,6 +286,56 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ confirm, reseed }),
       }),
+    getUpdateInfo: () =>
+      request<{
+        app_name: string;
+        current_version: string;
+        latest_version: string;
+        release_date: string;
+        app_root_dir: string;
+        storage_dir: string;
+        update_channel: string;
+        is_up_to_date: boolean;
+        changelog: Array<{
+          version: string;
+          date: string;
+          title: string;
+          is_latest: boolean;
+          highlights: Array<{ category: string; icon: string; content: string }>;
+        }>;
+      }>('/settings/update/info'),
+    applyUpdatePackage: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${BASE_URL}/settings/update/apply`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || res.statusText);
+      }
+      return res.json();
+    },
+    checkGitHubUpdate: (params?: { repo?: string; branch?: string; token?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.repo) q.append('repo', params.repo);
+      if (params?.branch) q.append('branch', params.branch);
+      if (params?.token) q.append('token', params.token);
+      const queryStr = q.toString() ? `?${q.toString()}` : '';
+      return request<any>(`/settings/update/github/check${queryStr}`);
+    },
+    applyGitHubUpdate: (payload: { mode?: string; repo?: string; branch?: string; token?: string; force_overwrite?: boolean }) =>
+      request<any>('/settings/update/github/apply', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    getGitHubConfig: () => request<any>('/settings/update/github/config'),
+    saveGitHubConfig: (config: { repo?: string; branch?: string; token?: string; mode?: string }) =>
+      request<any>('/settings/update/github/config', {
+        method: 'POST',
+        body: JSON.stringify(config),
+      }),
   },
 
   // Screen Time & Discipline

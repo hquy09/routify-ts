@@ -62,6 +62,7 @@ const SEARCH_INDEX: SearchIndexItem[] = [
   { id: 'discipline-scoring', title: 'Thuật toán & Cơ chế tính điểm kỷ luật', tab: 'ADVANCED', tabName: 'Nâng cao', keywords: ['kỷ luật', 'rating', 'thuật toán', 'trừ điểm', 'ngưỡng', 'hệ số', 'công thức'] },
   { id: 'quiet-hours', title: 'Chế độ Giờ yên tĩnh', tab: 'ADVANCED', tabName: 'Nâng cao', keywords: ['yên tĩnh', 'quiet', 'đêm', 'ngủ', 'không làm phiền'] },
   { id: 'smart-schedule', title: 'Gợi ý xếp lịch thông minh', tab: 'ADVANCED', tabName: 'Nâng cao', keywords: ['gợi ý', 'thông minh', 'smart', 'schedule', 'xếp lịch'] },
+  { id: 'auto-update', title: 'Tự động cập nhật ứng dụng (Auto Update) & Changelog', tab: 'BACKUP', tabName: 'Sao lưu', keywords: ['update', 'cập nhật', 'auto update', 'phiên bản', 'version', 'changelog', 'dán file'] },
   { id: 'gdrive', title: 'Đồng bộ Google Drive', tab: 'BACKUP', tabName: 'Sao lưu', keywords: ['drive', 'google', 'đồng bộ', 'sync', 'đám mây', 'cloud'] },
   { id: 'backup-zip', title: 'Gói sao lưu di động (.zip)', tab: 'BACKUP', tabName: 'Sao lưu', keywords: ['zip', 'sao lưu', 'backup', 'xuất', 'nhập', 'khôi phục'] },
   { id: 'db-stats', title: 'Cơ sở dữ liệu SQLite & Dung lượng', tab: 'BACKUP', tabName: 'Sao lưu', keywords: ['sqlite', 'database', 'cơ sở dữ liệu', 'dung lượng'] },
@@ -2707,6 +2708,67 @@ export const SettingsPage: React.FC<{ isDark: boolean; onToggleTheme: () => void
           {/* ================= TAB 5: BACKUP & SYNC ================= */}
           {activeTab === 'BACKUP' && (
             <div className="space-y-5 animate-in fade-in-50 duration-200">
+              {/* Auto Update & Version Info Card */}
+              <div className="bg-gradient-to-br from-indigo-50/50 via-white to-sky-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-xl p-5 space-y-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-indigo-100/70 dark:border-slate-800 gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <RefreshCw className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                          Tự động cập nhật từ GitHub (Auto Update)
+                        </span>
+                        <Badge variant="default" className="text-[10px] py-0 px-2 font-mono bg-indigo-600 text-white hover:bg-indigo-700">v1.2.0</Badge>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Đồng bộ mã nguồn 1-click từ GitHub hoặc gói ZIP, bảo vệ an toàn 100% cơ sở dữ liệu SQLite
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.dispatchEvent(new CustomEvent('lifeos_open_changelog'))}
+                      className="text-xs h-8"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+                      <span>Xem Changelog</span>
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => window.dispatchEvent(new CustomEvent('lifeos_open_auto_update'))}
+                      className="text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      <Upload className="w-3.5 h-3.5 mr-1.5" />
+                      <span>Mở Cập nhật</span>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                      📁 Phân vùng làm việc (App Partition)
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 break-all select-all">
+                      C:\Users\Huu Quy\Pictures\lifeos
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                      🛡️ Bảo vệ dữ liệu cá nhân
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Tự động sao lưu snapshot trước khi trích xuất. Không bao giờ ghi đè file <code>lifeos.db</code>.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* Google Drive Card */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5 shadow-xs">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">

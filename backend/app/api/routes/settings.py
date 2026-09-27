@@ -266,3 +266,125 @@ def reset_database(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Lỗi khi đặt lại dữ liệu: {str(e)}")
+
+# ==============================================================================
+# PHASE 6: AUTO UPDATE & APP PARTITION FILE SYNC
+# ==============================================================================
+
+@router.get("/update/info")
+def get_update_info(db: Session = Depends(get_database)):
+    """Returns application version, changelog, and partition path."""
+    from app.services.update_service import UpdateService
+    return UpdateService.get_info(db)
+
+@router.post("/update/apply")
+async def apply_update_package(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_database)
+):
+    """
+    Auto Update Feature: Receives an update package (.zip), automatically creates a safety
+    backup snapshot, and extracts/pastes files into the application partition (Workspace Root).
+    """
+    from app.services.update_service import UpdateService
+
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    temp_zip = BACKUPS_DIR / f"update_pkg_{file.filename}"
+
+    try:
+        with open(temp_zip, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        res = UpdateService.apply_update_package(db, temp_zip)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if temp_zip.exists():
+            temp_zip.unlink(missing_ok=True)
+
+@router.post("/update/paste-file")
+async def paste_file_to_partition(
+    file: UploadFile = File(...),
+    relative_path: str = Body(..., embed=True),
+    db: Session = Depends(get_database)
+):
+    """Pastes an individual file directly into a relative folder of the app partition."""
+    from app.services.update_service import UpdateService
+
+    temp_path = BACKUPS_DIR / f"temp_{file.filename}"
+    try:
+        with open(temp_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        res = UpdateService.paste_files_to_partition(db, temp_path, relative_path)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+
+# ==============================================================================
+# GITHUB AUTO-UPDATE ENDPOINTS
+# ==============================================================================
+
+class GitHubUpdateRequest(BaseModel):
+    mode: Optional[str] = "auto"
+    repo: Optional[str] = None
+    branch: Optional[str] = None
+    token: Optional[str] = None
+    force_overwrite: Optional[bool] = False
+
+class GitHubConfigUpdate(BaseModel):
+    repo: Optional[str] = None
+    branch: Optional[str] = None
+    token: Optional[str] = None
+    mode: Optional[str] = None
+
+@router.get("/update/github/check")
+def check_github_update(
+    repo: Optional[str] = None,
+    branch: Optional[str] = None,
+    token: Optional[str] = None,
+    db: Session = Depends(get_database)
+):
+    """Checks for new commits / releases on GitHub repository."""
+    from app.services.update_service import UpdateService
+    return UpdateService.check_github_updates(db, repo=repo, branch=branch, token=token)
+
+@router.post("/update/github/apply")
+def apply_github_update(
+    payload: GitHubUpdateRequest,
+    db: Session = Depends(get_database)
+):
+    """Performs 1-click update from GitHub via git pull or direct zip download/extract."""
+    from app.services.update_service import UpdateService
+    try:
+        return UpdateService.apply_github_update(
+            db,
+            mode=payload.mode or "auto",
+            repo=payload.repo,
+            branch=payload.branch,
+            token=payload.token,
+            force_overwrite=payload.force_overwrite or False
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/update/github/config")
+def get_github_config(db: Session = Depends(get_database)):
+    """Gets saved GitHub configuration."""
+    from app.services.update_service import UpdateService
+    return UpdateService.get_github_config(db)
+
+@router.post("/update/github/config")
+def save_github_config(
+    payload: GitHubConfigUpdate,
+    db: Session = Depends(get_database)
+):
+    """Saves GitHub configuration."""
+    from app.services.update_service import UpdateService
+    return UpdateService.save_github_config(db, payload.model_dump())
+
+

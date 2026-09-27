@@ -12,8 +12,13 @@ import { MentalHealthPage } from './pages/MentalHealthPage';
 import { CommandPalette } from './components/command/CommandPalette';
 import { TaskModal } from './components/tasks/TaskModal';
 import { SystemLegendModal } from './components/common/SystemLegendModal';
+import { WeeklyReviewModal } from './components/dashboard/WeeklyReviewModal';
+import { ChangelogModal } from './components/common/ChangelogModal';
+import { AutoUpdateModal } from './components/common/AutoUpdateModal';
 import { Goal, HeaderSummary } from './types';
 import { api } from './services/api';
+
+const CURRENT_APP_VERSION = '1.2.0';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -26,6 +31,11 @@ export function App() {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isQuickTaskModalOpen, setIsQuickTaskModalOpen] = useState(false);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [isAutoUpdateOpen, setIsAutoUpdateOpen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
   const [quickTaskTitle, setQuickTaskTitle] = useState<string | undefined>(undefined);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [streakCount, setStreakCount] = useState<number>(0);
@@ -41,6 +51,47 @@ export function App() {
       localStorage.setItem('lifeos_theme', 'light');
     }
   }, [isDark]);
+
+  // First-time visit: Check changelog display
+  useEffect(() => {
+    const lastSeenVersion = localStorage.getItem('lifeos_last_seen_changelog_version');
+    if (lastSeenVersion !== CURRENT_APP_VERSION) {
+      setIsChangelogOpen(true);
+    }
+  }, []);
+
+  // Fullscreen state listener
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullScreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullScreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullScreen(false);
+    }
+  };
+
+  // Date and Week calculation for Weekly Review
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const getISOWeek = (d: Date) => {
+    const date = new Date(d.getTime());
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
+    const week1 = new Date(date.getFullYear(), 0, 4);
+    return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  };
+  const currentWeekNumber = getISOWeek(now);
 
   // Load initial global stats (goals, streak, discipline rating, upcoming event)
   const loadGlobalStats = async () => {
@@ -95,7 +146,7 @@ export function App() {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground antialiased font-sans selection:bg-neutral-900 selection:text-white dark:selection:bg-neutral-100 dark:selection:text-black">
-      {/* 1. Left Sidebar */}
+      {/* 1. Left Sidebar (Includes Quick Actions: Weekly Review & Fullscreen) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => setCurrentTab(tab)}
@@ -105,13 +156,18 @@ export function App() {
         }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => {
-          setIsSidebarCollapsed(prev => {
+          setIsSidebarCollapsed((prev) => {
             const next = !prev;
             localStorage.setItem('lifeos_sidebar_collapsed', String(next));
             return next;
           });
         }}
         onOpenLegend={() => setIsLegendOpen(true)}
+        onOpenWeeklyReview={() => setIsReviewModalOpen(true)}
+        onToggleFullScreen={toggleFullScreen}
+        isFullScreen={isFullScreen}
+        onOpenChangelog={() => setIsChangelogOpen(true)}
+        onOpenAutoUpdate={() => setIsAutoUpdateOpen(true)}
       />
 
       {/* 2. Main Content Area */}
@@ -188,6 +244,33 @@ export function App() {
       <SystemLegendModal
         isOpen={isLegendOpen}
         onClose={() => setIsLegendOpen(false)}
+      />
+
+      {/* Global Weekly Review Modal (Can be launched from Sidebar at any time) */}
+      <WeeklyReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        year={currentYear}
+        weekNumber={currentWeekNumber}
+        onReviewSaved={() => {
+          loadGlobalStats();
+          window.dispatchEvent(new CustomEvent('lifeos_task_updated'));
+        }}
+      />
+
+      {/* Changelog Modal (What's New on initial load or manual click) */}
+      <ChangelogModal
+        isOpen={isChangelogOpen}
+        onClose={() => setIsChangelogOpen(false)}
+        currentVersion={CURRENT_APP_VERSION}
+        onOpenAutoUpdate={() => setIsAutoUpdateOpen(true)}
+      />
+
+      {/* Auto Update Modal (File pasting to app partition) */}
+      <AutoUpdateModal
+        isOpen={isAutoUpdateOpen}
+        onClose={() => setIsAutoUpdateOpen(false)}
+        onOpenChangelog={() => setIsChangelogOpen(true)}
       />
 
       {/* Floating Help / Legend Button at Bottom Left of Viewport */}
