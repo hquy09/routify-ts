@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft,
   CheckCircle2, Plus, Flame, Clock, MapPin, StickyNote, Trash2,
   Sparkles, CheckSquare, Layers, AlertCircle, Flag, Maximize2, Minimize2,
-  Zap, Split, Edit2
+  Zap, Split, Edit2, CornerDownRight
 } from 'lucide-react';
 import {
   CalendarDayView, Task, CalendarNote, ScheduleOccurrenceView,
@@ -518,6 +518,12 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
               <div className="flex flex-wrap gap-2">
                 {allDayTasks.map((t) => {
                   const isDone = t.status === 'COMPLETED';
+                  const isTransferred = Boolean(
+                    t.transferred_from_id ||
+                    t.transferred_to_id ||
+                    t.transferred_from_title ||
+                    t.status === 'TRANSFERRED'
+                  );
                   const deadline = getDeadlineInfo(t.due_datetime, t.status);
                   const pCfg = PRIORITY_CONFIG[(t.priority as PriorityLevel)] || PRIORITY_CONFIG.MEDIUM;
                   return (
@@ -527,6 +533,8 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                       className={`group flex items-center gap-2 px-2.5 py-1 rounded-lg border text-xs cursor-pointer transition shadow-2xs ${
                         isDone
                           ? 'bg-slate-100 dark:bg-slate-900/60 text-slate-400 border-slate-200 dark:border-slate-800 line-through'
+                          : isTransferred
+                          ? 'bg-purple-50/80 dark:bg-purple-950/40 text-purple-950 dark:text-purple-100 border-purple-300 dark:border-purple-800 border-l-[3.5px] border-l-purple-500 ring-1 ring-purple-400/20'
                           : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-neutral-900 dark:hover:border-neutral-100'
                       }`}
                     >
@@ -536,15 +544,34 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                           onToggleTask(t);
                         }}
                         className="text-slate-400 hover:text-emerald-500"
-                        title={isDone ? 'Đánh dấu chưa xong' : 'Đánh dấu xong'}
+                        title={
+                          t.status === 'TRANSFERRED'
+                            ? 'Nhiệm vụ đã chuyển tiếp sang thời điểm khác'
+                            : isDone
+                            ? 'Đánh dấu chưa xong'
+                            : 'Đánh dấu xong'
+                        }
                       >
                         {isDone ? (
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : t.status === 'TRANSFERRED' ? (
+                          <div className="w-3.5 h-3.5 rounded flex items-center justify-center bg-purple-100 dark:bg-purple-900/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 shadow-2xs">
+                            <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                          </div>
                         ) : (
                           <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-slate-600 hover:border-emerald-500" />
                         )}
                       </button>
                       <span className="font-medium truncate max-w-[200px]">{t.title}</span>
+                      {isTransferred && (
+                        <span
+                          title="Nhiệm vụ chuyển tiếp"
+                          className="text-[9px] px-1.5 py-0.2 rounded font-extrabold border bg-purple-100 text-purple-800 dark:bg-purple-900/80 dark:text-purple-200 border-purple-300 dark:border-purple-700 flex items-center gap-0.5 shadow-2xs shrink-0"
+                        >
+                          <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                          <span>Chuyển tiếp</span>
+                        </span>
+                      )}
                       <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold border ${pCfg.badgeBg} ${pCfg.textColor} ${pCfg.borderColor}`}>
                         {pCfg.shortLabel}
                       </span>
@@ -812,45 +839,71 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                 </span>
                               </div>
                               <div className="space-y-1 max-h-24 overflow-y-auto pr-0.5 pointer-events-auto">
-                                {attachedTasks.map((t) => (
-                                  <div
-                                    key={t.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onTaskClick(t);
-                                    }}
-                                    className="flex items-center gap-1.5 p-1 rounded bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/80 text-[11px] hover:border-emerald-400 transition cursor-pointer"
-                                  >
-                                    <button
-                                      type="button"
+                                {attachedTasks.map((t) => {
+                                  const isTransferred = Boolean(
+                                    t.transferred_from_id ||
+                                    t.transferred_to_id ||
+                                    t.transferred_from_title ||
+                                    t.status === 'TRANSFERRED'
+                                  );
+                                  return (
+                                    <div
+                                      key={t.id}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        onToggleTask(t);
+                                        onTaskClick(t);
                                       }}
-                                      className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition shrink-0 ${
+                                      className={`flex items-center gap-1.5 p-1 rounded text-[11px] transition cursor-pointer ${
                                         t.status === 'COMPLETED'
-                                          ? 'bg-emerald-500 border-emerald-500 text-white'
-                                          : 'border-slate-300 dark:border-slate-600 hover:border-emerald-500'
+                                          ? 'bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/80'
+                                          : isTransferred
+                                          ? 'bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 border-l-[3px] border-l-purple-500 text-purple-950 dark:text-purple-100'
+                                          : 'bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/80 hover:border-emerald-400'
                                       }`}
                                     >
-                                      {t.status === 'COMPLETED' && <CheckCircle2 className="w-2.5 h-2.5" />}
-                                    </button>
-                                    <span
-                                      className={`truncate flex-1 font-medium ${
-                                        t.status === 'COMPLETED'
-                                          ? 'line-through text-slate-400 dark:text-slate-500'
-                                          : 'text-slate-800 dark:text-slate-200'
-                                      }`}
-                                    >
-                                      {t.title}
-                                    </span>
-                                    {t.difficulty && (
-                                      <span className="text-[9px] font-bold text-amber-500 shrink-0">
-                                        ★{t.difficulty}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onToggleTask(t);
+                                        }}
+                                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition shrink-0 ${
+                                          t.status === 'COMPLETED'
+                                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                                            : t.status === 'TRANSFERRED'
+                                            ? 'bg-purple-100 dark:bg-purple-900/80 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700'
+                                            : 'border-slate-300 dark:border-slate-600 hover:border-emerald-500'
+                                        }`}
+                                      >
+                                        {t.status === 'COMPLETED' ? (
+                                          <CheckCircle2 className="w-2.5 h-2.5" />
+                                        ) : t.status === 'TRANSFERRED' ? (
+                                          <CornerDownRight className="w-2 h-2 stroke-[2.5]" />
+                                        ) : null}
+                                      </button>
+                                      <span
+                                        className={`truncate flex-1 font-medium ${
+                                          t.status === 'COMPLETED'
+                                            ? 'line-through text-slate-400 dark:text-slate-500'
+                                            : 'text-slate-800 dark:text-slate-200'
+                                        }`}
+                                      >
+                                        {t.title}
                                       </span>
-                                    )}
-                                  </div>
-                                ))}
+                                      {isTransferred && (
+                                        <span className="text-[8.5px] px-1 py-0.2 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/80 dark:text-purple-200 font-bold border border-purple-300 dark:border-purple-700 flex items-center gap-0.5 shrink-0">
+                                          <CornerDownRight className="w-2 h-2 stroke-[2.5]" />
+                                          <span>Chuyển</span>
+                                        </span>
+                                      )}
+                                      {t.difficulty && (
+                                        <span className="text-[9px] font-bold text-amber-500 shrink-0">
+                                          ★{t.difficulty}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -879,18 +932,25 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                   >
                     {processedTasks.map((item) => {
                       const isDone = item.task.status === 'COMPLETED';
+                      const isTransferred = Boolean(
+                        item.task.transferred_from_id ||
+                        item.task.transferred_to_id ||
+                        item.task.transferred_from_title ||
+                        item.task.status === 'TRANSFERRED'
+                      );
                       const pCfg = PRIORITY_CONFIG[(item.task.priority as PriorityLevel)] || PRIORITY_CONFIG.MEDIUM;
                       const dCfg = DIFFICULTY_CONFIG[item.task.difficulty] || DIFFICULTY_CONFIG[2];
                       const deadline = getDeadlineInfo(item.task.due_datetime, item.task.status);
 
-                      const priorityColor =
-                        item.task.priority === 'URGENT'
-                          ? '#f43f5e'
-                          : item.task.priority === 'HIGH'
-                          ? '#f59e0b'
-                          : item.task.priority === 'MEDIUM'
-                          ? '#3b82f6'
-                          : '#94a3b8';
+                      const priorityColor = isTransferred
+                        ? '#a855f7'
+                        : item.task.priority === 'URGENT'
+                        ? '#f43f5e'
+                        : item.task.priority === 'HIGH'
+                        ? '#f59e0b'
+                        : item.task.priority === 'MEDIUM'
+                        ? '#3b82f6'
+                        : '#94a3b8';
 
                       const colWidthPct = 100 / item.totalCols;
                       const colLeftPct = item.colIndex * colWidthPct;
@@ -903,6 +963,8 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                           className={`absolute rounded-xl p-2.5 border shadow-xs transition-all cursor-pointer overflow-hidden z-20 group hover:z-30 hover:shadow-md ${
                             isDone
                               ? 'bg-slate-50/90 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-70'
+                              : isTransferred
+                              ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800 text-purple-950 dark:text-purple-100 ring-1 ring-purple-400/20'
                               : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-700 hover:border-neutral-900 dark:hover:border-neutral-100'
                           }`}
                           style={{
@@ -923,10 +985,20 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                   onToggleTask(item.task);
                                 }}
                                 className="mt-0.5 text-slate-400 hover:text-emerald-500 shrink-0"
-                                title={isDone ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'}
+                                title={
+                                  item.task.status === 'TRANSFERRED'
+                                    ? 'Nhiệm vụ đã chuyển tiếp sang thời điểm khác'
+                                    : isDone
+                                    ? 'Đánh dấu chưa hoàn thành'
+                                    : 'Đánh dấu hoàn thành'
+                                }
                               >
                                 {isDone ? (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                ) : item.task.status === 'TRANSFERRED' ? (
+                                  <div className="w-3.5 h-3.5 rounded flex items-center justify-center bg-purple-100 dark:bg-purple-900/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 shadow-2xs">
+                                    <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                                  </div>
                                 ) : (
                                   <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-slate-600 hover:border-emerald-500" />
                                 )}
@@ -969,6 +1041,16 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
 
                           {/* Horizontal Badges Row */}
                           <div className="mt-1.5 flex items-center gap-1 flex-wrap text-[9px]">
+                            {/* Transferred Indicator Badge */}
+                            {isTransferred && (
+                              <span
+                                title="Nhiệm vụ chuyển tiếp sang thời điểm mới"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-extrabold border text-[8.5px] bg-purple-100 text-purple-800 dark:bg-purple-900/80 dark:text-purple-200 border-purple-300 dark:border-purple-700 shadow-2xs shrink-0"
+                              >
+                                <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                                <span>Chuyển tiếp</span>
+                              </span>
+                            )}
                             {/* Deadline Countdown Badge */}
                             {deadline.hasDeadline && (
                               <span
@@ -1108,11 +1190,19 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
               ) : (
                 data.tasks.map((t) => {
                   const isDone = t.status === 'COMPLETED';
+                  const isTransferred = Boolean(
+                    t.transferred_from_id ||
+                    t.transferred_to_id ||
+                    t.transferred_from_title ||
+                    t.status === 'TRANSFERRED'
+                  );
                   const pCfg = PRIORITY_CONFIG[(t.priority as PriorityLevel)] || PRIORITY_CONFIG.MEDIUM;
                   const dCfg = DIFFICULTY_CONFIG[t.difficulty] || DIFFICULTY_CONFIG[2];
 
                   const priorityBorder = isDone
                     ? 'border-l-slate-300 dark:border-l-slate-700'
+                    : isTransferred
+                    ? 'border-l-purple-500 dark:border-l-purple-400'
                     : t.priority === 'URGENT'
                     ? 'border-l-rose-500'
                     : t.priority === 'HIGH'
@@ -1128,6 +1218,8 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                       className={`p-3 rounded-xl border border-l-4 ${priorityBorder} text-xs transition cursor-pointer group ${
                         isDone
                           ? 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800/80 text-slate-400'
+                          : isTransferred
+                          ? 'bg-purple-50/70 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800/80 text-purple-950 dark:text-purple-100 ring-1 ring-purple-400/20 shadow-2xs'
                           : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-700/80 hover:border-neutral-900 dark:hover:border-neutral-100 text-slate-800 dark:text-slate-200 shadow-2xs'
                       }`}
                     >
@@ -1138,9 +1230,20 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                             onToggleTask(t);
                           }}
                           className="mt-0.5 text-slate-400 hover:text-emerald-500 shrink-0"
+                          title={
+                            t.status === 'TRANSFERRED'
+                              ? 'Nhiệm vụ đã chuyển tiếp sang thời điểm khác'
+                              : isDone
+                              ? 'Đánh dấu chưa xong'
+                              : 'Đánh dấu xong'
+                          }
                         >
                           {isDone ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : t.status === 'TRANSFERRED' ? (
+                            <div className="w-4 h-4 rounded flex items-center justify-center bg-purple-100 dark:bg-purple-900/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 shadow-2xs">
+                              <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                            </div>
                           ) : (
                             <div className="w-4 h-4 rounded border border-slate-300 dark:border-slate-600 hover:border-emerald-500" />
                           )}
@@ -1156,6 +1259,16 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                           </p>
 
                           <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
+                            {/* Transferred Indicator Pill */}
+                            {isTransferred && (
+                              <span
+                                title="Nhiệm vụ chuyển tiếp sang kỳ/ngày khác"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-900/80 dark:text-purple-200 border border-purple-300 dark:border-purple-700 shadow-2xs"
+                              >
+                                <CornerDownRight className="w-3 h-3 stroke-[2.5]" />
+                                <span>Đã chuyển tiếp</span>
+                              </span>
+                            )}
                             {/* Priority Pill */}
                             <span
                               title={`Mức ưu tiên: ${pCfg.label} - ${pCfg.description}`}

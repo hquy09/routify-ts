@@ -71,16 +71,37 @@ async def telegram_reminder_worker():
         
         await asyncio.sleep(interval)
 
+async def telegram_bot_worker():
+    """Background worker for receiving and responding to Telegram bot commands in real-time."""
+    # Wait 3s on startup
+    await asyncio.sleep(3)
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                # Run polling in worker thread to keep FastAPI non-blocking
+                await asyncio.to_thread(TelegramService.poll_and_handle_updates, db)
+            finally:
+                db.close()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            await asyncio.sleep(5)
+
+        await asyncio.sleep(1)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: spawn background reminder worker
-    worker_task = asyncio.create_task(telegram_reminder_worker())
+    # Startup: spawn background reminder worker and real-time interactive bot worker
+    reminder_task = asyncio.create_task(telegram_reminder_worker())
+    bot_task = asyncio.create_task(telegram_bot_worker())
     yield
-    # Shutdown: cancel worker
-    worker_task.cancel()
+    # Shutdown: cancel workers
+    reminder_task.cancel()
+    bot_task.cancel()
     try:
-        await worker_task
-    except asyncio.CancelledError:
+        await asyncio.gather(reminder_task, bot_task, return_exceptions=True)
+    except Exception:
         pass
 
 app = FastAPI(

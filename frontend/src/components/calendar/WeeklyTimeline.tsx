@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon,
   CheckCircle2, AlertCircle, Clock, Plus, Flame, BookOpen,
   MapPin, Trash2, ExternalLink, Flag, Edit2, CheckSquare,
-  Eye, EyeOff, Layers, Zap, CalendarDays
+  Eye, EyeOff, Layers, Zap, CalendarDays, CornerDownRight
 } from 'lucide-react';
 import {
   CalendarWeeklyResponse, CalendarDayView, Task,
@@ -350,6 +350,8 @@ export const WeeklyTimeline: React.FC<WeeklyTimelineProps> = ({
 
     const priorityBorder = isDone
       ? 'border-l-slate-300 dark:border-l-slate-700'
+      : isTransferred
+      ? 'border-l-purple-500 dark:border-l-purple-400'
       : t.priority === 'URGENT'
       ? 'border-l-rose-500'
       : t.priority === 'HIGH'
@@ -364,6 +366,8 @@ export const WeeklyTimeline: React.FC<WeeklyTimelineProps> = ({
         className={`rounded-lg p-1.5 border border-l-[3.5px] ${priorityBorder} text-xs transition-all cursor-pointer group select-none shadow-xs hover:shadow-md ${
           isDone
             ? 'bg-slate-50/90 border-slate-200 text-slate-400 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-500'
+            : isTransferred
+            ? 'bg-purple-50/70 border-purple-200/90 dark:bg-purple-950/40 dark:border-purple-800/80 text-purple-950 dark:text-purple-100 ring-1 ring-purple-400/20'
             : isOverlaid
             ? 'bg-white/95 dark:bg-slate-900/95 border-slate-200/90 dark:border-slate-700 backdrop-blur-xs text-slate-900 dark:text-slate-100 ring-1 ring-black/5 dark:ring-white/5'
             : 'bg-white border-slate-200 hover:border-neutral-900 text-slate-900 dark:bg-slate-800/90 dark:border-slate-700 dark:hover:border-neutral-100 dark:text-slate-200'
@@ -377,10 +381,20 @@ export const WeeklyTimeline: React.FC<WeeklyTimelineProps> = ({
               onToggleTask(t);
             }}
             className="mt-0.5 text-slate-400 hover:text-emerald-500 shrink-0"
-            title={isDone ? 'Đánh dấu chưa xong' : 'Đánh dấu đã xong'}
+            title={
+              (t.status as string) === 'TRANSFERRED'
+                ? 'Nhiệm vụ đã chuyển tiếp sang thời điểm khác'
+                : isDone
+                ? 'Đánh dấu chưa xong'
+                : 'Đánh dấu đã xong'
+            }
           >
             {isDone ? (
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (t.status as string) === 'TRANSFERRED' ? (
+              <div className="w-3.5 h-3.5 rounded flex items-center justify-center bg-purple-100 dark:bg-purple-900/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 shadow-2xs">
+                <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+              </div>
             ) : (
               <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-slate-500 hover:border-emerald-500" />
             )}
@@ -406,17 +420,17 @@ export const WeeklyTimeline: React.FC<WeeklyTimelineProps> = ({
             </div>
 
             <div className="flex items-center gap-1 mt-1 text-[9px] flex-wrap">
-              {/* Ký hiệu chuyển tiếp (Transferred symbol) */}
+              {/* Ký hiệu chuyển tiếp (Transferred purple indicator badge) */}
               {isTransferred && (
                 <span
                   title={
                     t.transferred_from_date
                       ? `Nhiệm vụ chuyển tiếp từ ngày ${t.transferred_from_date}`
-                      : 'Nhiệm vụ được chuyển tiếp'
+                      : 'Nhiệm vụ đã chuyển tiếp sang thời điểm mới'
                   }
-                  className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded font-bold border text-[8.5px] bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-extrabold border text-[8.5px] bg-purple-100 text-purple-800 dark:bg-purple-900/80 dark:text-purple-200 border-purple-300 dark:border-purple-700 shadow-2xs"
                 >
-                  <span>🔄</span>
+                  <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
                   <span>Chuyển tiếp</span>
                 </span>
               )}

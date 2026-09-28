@@ -1783,6 +1783,48 @@ export const SettingsPage: React.FC<{ isDark: boolean; onToggleTheme: () => void
                   </div>
                 </div>
 
+                {/* Interactive Commands Guide */}
+                <div className="p-3.5 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-gradient-to-br from-blue-50/60 to-indigo-50/40 dark:from-blue-950/20 dark:to-indigo-950/10 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900 dark:text-blue-300">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>Lệnh Tương Tác 2 Chiều Trên Telegram (Interactive Commands)</span>
+                    </div>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                      Realtime Active
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Bạn có thể nhắn tin trực tiếp cho Bot bất kỳ lúc nào để tra cứu hoặc tạo việc nhanh:
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                    <div className="p-2 rounded-lg bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                      <code className="text-blue-600 dark:text-blue-400 font-bold font-mono">/dashboard</code>
+                      <p className="text-slate-600 dark:text-slate-400 text-[10.5px] mt-0.5">
+                        Xem chuỗi ngày (Streak), tiến độ nhiệm vụ hôm nay/tuần và điểm nỗ lực tích lũy (XP).
+                      </p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                      <code className="text-blue-600 dark:text-blue-400 font-bold font-mono">/viewtask [day|week]</code>
+                      <p className="text-slate-600 dark:text-slate-400 text-[10.5px] mt-0.5">
+                        Xem danh sách việc hôm nay (<span className="font-mono">/viewtask d</span>) hoặc cả tuần (<span className="font-mono">/viewtask w</span>).
+                      </p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                      <code className="text-blue-600 dark:text-blue-400 font-bold font-mono">/addtask &lt;tên&gt; [tham số]</code>
+                      <p className="text-slate-600 dark:text-slate-400 text-[10.5px] mt-0.5">
+                        Thêm việc mới: <span className="font-mono">-d mai 18:00</span>, <span className="font-mono">-p high</span>, <span className="font-mono">-diff 3</span>, <span className="font-mono">-m ghi chú</span>.
+                      </p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                      <code className="text-blue-600 dark:text-blue-400 font-bold font-mono">/done &lt;id&gt;</code> &bull; <code className="text-blue-600 dark:text-blue-400 font-bold font-mono">/help</code>
+                      <p className="text-slate-600 dark:text-slate-400 text-[10.5px] mt-0.5">
+                        Đánh dấu hoàn thành việc ngay lập tức theo ID, cộng điểm nỗ lực và tăng streak.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Action Buttons */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex flex-wrap items-center gap-2">

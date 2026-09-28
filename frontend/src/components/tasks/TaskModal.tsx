@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  X, Plus, Trash2, Flame, Clock, Flag, AlertCircle, BookOpen, GraduationCap,
-  Link2, Calendar, FileText, CheckSquare, Sparkles, Pin, Target, Layers,
-  ArrowUp, ArrowDown, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle,
-  Bell, Repeat, Hash, Timer, Check
+  X, Plus, Trash2, Flame, Clock, Flag, BookOpen, GraduationCap,
+  Pin, ArrowUp, ArrowDown, Sparkles, Check, CheckSquare,
+  Hash, FileText, Calendar
 } from 'lucide-react';
 import {
-  Task, Goal, Project, TaskStatus, DIFFICULTY_CONFIG, PRIORITY_CONFIG,
+  Task, Goal, TaskStatus, DIFFICULTY_CONFIG, PRIORITY_CONFIG,
   TASK_STATUS_LABELS, TASK_STATUS_COLORS, Course, CourseNode, FixedSchedule
 } from '../../types';
 import { api } from '../../services/api';
@@ -34,7 +33,7 @@ interface TaskModalProps {
   goals?: Goal[];
   courses?: Course[];
   fixedSchedules?: FixedSchedule[];
-  initialDate?: string; // Pre-filled due date (e.g. clicked on calendar day)
+  initialDate?: string;
   initialTitle?: string;
   initialCourseNodeId?: number;
   initialFixedScheduleId?: number;
@@ -42,6 +41,16 @@ interface TaskModalProps {
 }
 
 const DOW_SHORT = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const DAY_LABELS = [
+  'Thứ Hai (T2)',
+  'Thứ Ba (T3)',
+  'Thứ Tư (T4)',
+  'Thứ Năm (T5)',
+  'Thứ Sáu (T6)',
+  'Thứ Bảy (T7)',
+  'Chủ Nhật (CN)',
+];
+
 const QUICK_TITLES = [
   'Làm BTVN Toán', 'Học từ vựng Tiếng Anh', 'Đọc tài liệu Văn',
   'Luyện đề Vật lý', 'Soạn bài Sinh học', 'Làm slide nhóm'
@@ -53,7 +62,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   onClose,
   onSave,
   taskToEdit,
-  goals = [],
   courses: propsCourses,
   fixedSchedules: propsFixedSchedules,
   initialDate,
@@ -69,14 +77,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const scrollBodyRef = useRef<HTMLDivElement>(null);
 
   const [description, setDescription] = useState('');
-  const [goalId, setGoalId] = useState<number | undefined>(undefined);
-  const [projectId, setProjectId] = useState<number | undefined>(undefined);
   const [courses, setCourses] = useState<Course[]>(propsCourses || []);
   const [allCourseNodes, setAllCourseNodes] = useState<CourseNode[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<number | undefined>(undefined);
   const [courseNodeId, setCourseNodeId] = useState<number | undefined>(initialCourseNodeId);
   const [fixedSchedulesList, setFixedSchedulesList] = useState<FixedSchedule[]>(propsFixedSchedules || []);
   const [scheduledWithFixedId, setScheduledWithFixedId] = useState<number | undefined>(initialFixedScheduleId);
+  const [scheduleDayFilter, setScheduleDayFilter] = useState<number | 'ALL'>('ALL');
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
 
   // Time & Classification
@@ -86,19 +93,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('MEDIUM');
   const [status, setStatus] = useState<TaskStatus>('TODO');
 
-  // Subtasks with Checkbox & Reordering
+  // Subtasks
   const [subtasks, setSubtasks] = useState<SubtaskItem[]>([]);
   const [newSubtaskInput, setNewSubtaskInput] = useState('');
 
-  // Extended Student Features
-  const [recurrenceRule, setRecurrenceRule] = useState<string>('NONE');
-  const [reminder, setReminder] = useState<string>('NONE');
-  const [estimatedPomodoros, setEstimatedPomodoros] = useState<number>(1);
+  // Tags
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTagInput, setCustomTagInput] = useState('');
 
-  // Accordion State
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Conflict State
@@ -155,8 +157,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setTitle(taskToEdit.title || '');
       setTitleError(false);
       setDescription(taskToEdit.description || '');
-      setGoalId(taskToEdit.goal_id ?? undefined);
-      setProjectId(taskToEdit.project_id ?? undefined);
       setCourseNodeId(taskToEdit.course_node_id ?? undefined);
       setScheduledWithFixedId(taskToEdit.scheduled_with_fixed_id ?? undefined);
       setDueDatetime(parseBackendDatetimeToLocalInput(taskToEdit.due_datetime));
@@ -164,7 +164,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setDifficulty(taskToEdit.difficulty ?? 2);
       setPriority(taskToEdit.priority || 'MEDIUM');
       setStatus(taskToEdit.status || 'TODO');
-      setRecurrenceRule(taskToEdit.recurrence_rule || 'NONE');
 
       // Populate subtasks from task
       if (taskToEdit.subtasks && taskToEdit.subtasks.length > 0) {
@@ -176,19 +175,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       } else {
         setSubtasks([]);
       }
-
-      // Check if any advanced fields are populated to open accordion
-      if (taskToEdit.goal_id || taskToEdit.project_id || taskToEdit.recurrence_rule) {
-        setIsAdvancedOpen(true);
-      } else {
-        setIsAdvancedOpen(false);
-      }
     } else {
       setTitle(initialTitle || '');
       setTitleError(false);
       setDescription('');
-      setGoalId(undefined);
-      setProjectId(undefined);
       setSelectedCourseId(undefined);
       setCourseNodeId(initialCourseNodeId);
       setScheduledWithFixedId(initialFixedScheduleId);
@@ -205,11 +195,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setPriority('MEDIUM');
       setStatus(initialStatus || 'TODO');
       setSubtasks([]);
-      setRecurrenceRule('NONE');
-      setReminder('NONE');
-      setEstimatedPomodoros(1);
       setSelectedTags([]);
-      setIsAdvancedOpen(false);
+      setScheduleDayFilter('ALL');
     }
   }, [
     isOpen,
@@ -222,13 +209,28 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   ]);
 
   // Derived Values
-  const safeGoals = goals || [];
-  const currentGoal = safeGoals.find((g) => g.id === Number(goalId));
-  const availableProjects = currentGoal?.projects || [];
   const availableLessons = allCourseNodes.filter((n) => n.course_id === Number(selectedCourseId));
   const selectedCourse = courses.find((c) => c.id === Number(selectedCourseId));
   const selectedLesson = allCourseNodes.find((n) => n.id === Number(courseNodeId));
   const selectedFixedSchedule = fixedSchedulesList.find((s) => s.id === Number(scheduledWithFixedId));
+
+  // Grouped Fixed Schedules by Day of Week
+  const groupedFixedSchedules = useMemo(() => {
+    const groups: { dayIndex: number; label: string; items: FixedSchedule[] }[] = [];
+    for (let i = 0; i <= 6; i++) {
+      if (scheduleDayFilter !== 'ALL' && scheduleDayFilter !== i) continue;
+      const items = fixedSchedulesList.filter((s) => s.day_of_week === i);
+      if (items.length > 0) {
+        const sorted = [...items].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+        groups.push({
+          dayIndex: i,
+          label: `📅 ${DAY_LABELS[i]}`,
+          items: sorted,
+        });
+      }
+    }
+    return groups;
+  }, [fixedSchedulesList, scheduleDayFilter]);
 
   // Subtask Progress
   const completedSubtasksCount = useMemo(() => {
@@ -291,7 +293,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     const updated = subtasks.map((st, i) => (i === index ? { ...st, is_completed: !st.is_completed } : st));
     setSubtasks(updated);
 
-    // If editing existing task with backend subtask id, toggle via API
     if (taskToEdit && target.id) {
       try {
         await api.tasks.toggleSubtask(target.id);
@@ -314,7 +315,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     const target = subtasks[index];
     setSubtasks(subtasks.filter((_, i) => i !== index));
 
-    // If editing existing task with backend subtask id, delete via API
     if (taskToEdit && target.id) {
       try {
         await api.tasks.deleteSubtask(target.id);
@@ -357,7 +357,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     try {
       await onSave(data);
 
-      // In edit mode: create any newly added subtasks without backend id
       if (taskToEdit && subtasks.length > 0) {
         for (const st of subtasks) {
           if (!st.id && st.title.trim()) {
@@ -403,8 +402,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     const data: any = {
       title: title.trim(),
       description: finalDescription || null,
-      goal_id: goalId ? Number(goalId) : null,
-      project_id: projectId ? Number(projectId) : null,
       course_node_id: courseNodeId ? Number(courseNodeId) : null,
       scheduled_with_fixed_id: scheduledWithFixedId ? Number(scheduledWithFixedId) : null,
       start_datetime: safeStart || null,
@@ -412,7 +409,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       difficulty,
       priority,
       status,
-      recurrence_rule: recurrenceRule !== 'NONE' ? recurrenceRule : null,
+      // Clear out deprecated fields
+      goal_id: null,
+      project_id: null,
+      recurrence_rule: null,
       subtask_titles: subtasks.length > 0 ? subtasks.map((s) => s.title) : undefined,
     };
 
@@ -433,12 +433,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     await proceedSave(data);
   };
 
-  // Safe early exit AFTER all hooks have executed
   if (!isOpen) return null;
 
   return (
     <>
-      {/* 1. Backdrop Overlay: Solid high-contrast coverage to eliminate any leaking background elements */}
+      {/* 1. Backdrop Overlay */}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
         <form
           onSubmit={handleSubmit}
@@ -458,25 +457,25 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   {taskToEdit ? 'Chỉnh sửa Nhiệm vụ' : 'Tạo Nhiệm vụ mới'}
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Thiết lập thông tin, lịch trình thực hiện và liên kết học tập
+                  Thiết lập thông tin, lịch trình thực hiện và liên kết môn học
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800"
+              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Modal Form Body: Balanced 2-Column Layout */}
-          <div ref={scrollBodyRef} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+          <div ref={scrollBodyRef} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* ================= LEFT COLUMN: CỐT LÕI & LỊCH TRÌNH ================= */}
-              <div className="lg:col-span-7 space-y-5">
+              {/* ================= LEFT COLUMN: THÔNG TIN CHÍNH, LỊCH TRÌNH & TKB ================= */}
+              <div className="lg:col-span-7 space-y-4">
                 
                 {/* 1. Tiêu đề nhiệm vụ (Autofocus + Error Ring + Quick Suggestions) */}
                 <div>
@@ -520,7 +519,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                           setTitle(qt);
                           setTitleError(false);
                         }}
-                        className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/60 transition"
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/60 transition cursor-pointer"
                       >
                         {qt}
                       </button>
@@ -538,7 +537,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     <select
                       value={priority}
                       onChange={(e: any) => setPriority(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium cursor-pointer"
                     >
                       <option value="LOW">⚪ Thấp</option>
                       <option value="MEDIUM">🔵 Trung bình</option>
@@ -555,9 +554,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     <select
                       value={status}
                       onChange={(e: any) => setStatus(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium cursor-pointer"
                     >
-                      <option value="TODO">Chưa hoàn thành</option>
+                      <option value="TODO">Chưa bắt đầu</option>
                       <option value="IN_PROGRESS">Đang thực hiện</option>
                       <option value="PARTIAL">Hoàn thành 1 phần</option>
                       <option value="COMPLETED">Đã hoàn thành</option>
@@ -589,7 +588,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                           type="button"
                           key={level}
                           onClick={() => setDifficulty(level)}
-                          className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition flex flex-col items-center gap-0.5 ${
+                          className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
                             isSelected
                               ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900 shadow-xs'
                               : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -601,21 +600,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         </button>
                       );
                     })}
-                  </div>
-
-                  {/* Minh bạch cơ chế điểm thưởng / XP */}
-                  <div className="p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2 leading-relaxed">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold">Cơ chế điểm thưởng XP:</span> Hoàn thành bài cấp độ {difficulty} mang lại{' '}
-                      <strong className="text-amber-700 dark:text-amber-300">+{difficulty} XP cơ bản</strong>
-                      {priority === 'URGENT'
-                        ? ' (hệ số Khẩn cấp x1.5)'
-                        : priority === 'HIGH'
-                        ? ' (hệ số Ưu tiên cao x1.25)'
-                        : ''}
-                      . Điểm này dùng để tăng Level Mastery khóa học, tích lũy chuỗi thói quen (Streak) và tính năng suất tuần trên Dashboard.
-                    </div>
                   </div>
                 </div>
 
@@ -629,58 +613,141 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   />
                 </div>
 
-                {/* 5. Ngữ cảnh học tập (Học sinh/Sinh viên): Lịch cố định & Khóa học */}
-                <div className="space-y-3 pt-1 border-t border-slate-200/70 dark:border-slate-800">
-                  <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>Ngữ cảnh học tập (Học sinh & Sinh viên)</span>
+                {/* 5. ĐÍNH KÈM LỊCH CỐ ĐỊNH (TKB) - PHÂN CHIA RÕ RÀNG THEO THỨ (T2-CN) */}
+                <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-purple-50/40 dark:from-indigo-950/30 dark:to-purple-950/20 border border-indigo-200/70 dark:border-indigo-800/60 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-900 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5">
+                      <Pin className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Đính kèm Lịch cố định (TKB)</span>
+                    </label>
+                    {selectedFixedSchedule && (
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFixedScheduleTime(selectedFixedSchedule.id)}
+                        className="text-[10px] px-2 py-0.5 rounded font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-900/60 hover:bg-indigo-200 dark:hover:bg-indigo-800 border border-indigo-300 dark:border-indigo-700 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                        title="Tự động điền khung giờ của lịch cố định này vào nhiệm vụ"
+                      >
+                        <Sparkles className="w-3 h-3 text-amber-500" />
+                        <span>Áp dụng giờ ({selectedFixedSchedule.start_time} - {selectedFixedSchedule.end_time})</span>
+                      </button>
+                    )}
                   </div>
 
-                  {/* ĐÍNH KÈM LỊCH CỐ ĐỊNH (TKB) */}
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-50/70 to-purple-50/40 dark:from-indigo-950/30 dark:to-purple-950/20 border border-indigo-200/70 dark:border-indigo-800/60 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-slate-900 dark:text-slate-100 font-semibold text-xs flex items-center gap-1.5">
-                        <Pin className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                        <span>Đính kèm Lịch cố định (TKB)</span>
-                      </label>
-                      {selectedFixedSchedule && (
-                        <button
-                          type="button"
-                          onClick={() => handleApplyFixedScheduleTime(selectedFixedSchedule.id)}
-                          className="text-[10px] px-2 py-0.5 rounded font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-900/60 hover:bg-indigo-200 dark:hover:bg-indigo-800 border border-indigo-300 dark:border-indigo-700 transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                          title="Tự động điền khung giờ của lịch cố định này vào nhiệm vụ"
-                        >
-                          <Sparkles className="w-3 h-3 text-amber-500" />
-                          <span>Áp dụng giờ ({selectedFixedSchedule.start_time} - {selectedFixedSchedule.end_time})</span>
-                        </button>
-                      )}
-                    </div>
-                    <select
-                      value={scheduledWithFixedId || ''}
-                      onChange={(e) => {
-                        const val = e.target.value ? Number(e.target.value) : undefined;
-                        setScheduledWithFixedId(val);
-                        if (val) {
-                          handleApplyFixedScheduleTime(val);
-                        }
-                      }}
-                      className="w-full bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
+                  {/* Day Filter Chips (Tất cả, T2, T3, ..., CN) */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleDayFilter('ALL')}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition cursor-pointer whitespace-nowrap ${
+                        scheduleDayFilter === 'ALL'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                          : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-100/50'
+                      }`}
                     >
-                      <option value="">-- Không đính kèm lịch cố định --</option>
-                      {fixedSchedulesList.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.icon || '📌'} {s.title} ({DOW_SHORT[s.day_of_week] || ''} {s.start_time} - {s.end_time})
-                        </option>
-                      ))}
-                    </select>
+                      Tất cả thứ
+                    </button>
+                    {DOW_SHORT.map((dow, idx) => (
+                      <button
+                        key={dow}
+                        type="button"
+                        onClick={() => setScheduleDayFilter(idx)}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition cursor-pointer whitespace-nowrap ${
+                          scheduleDayFilter === idx
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                            : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-100/50'
+                        }`}
+                      >
+                        {dow}
+                      </button>
+                    ))}
                   </div>
 
-                  {/* KHÓA HỌC & BÀI HỌC / TIẾT HỌC */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Dropdown with Optgroups grouped by Day */}
+                  <select
+                    value={scheduledWithFixedId || ''}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : undefined;
+                      setScheduledWithFixedId(val);
+                      if (val) {
+                        handleApplyFixedScheduleTime(val);
+                      }
+                    }}
+                    className="w-full bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium cursor-pointer"
+                  >
+                    <option value="">-- Không đính kèm lịch cố định --</option>
+                    {groupedFixedSchedules.length === 0 ? (
+                      <option disabled value="">(Không có lịch nào cho ngày này)</option>
+                    ) : (
+                      groupedFixedSchedules.map((group) => (
+                        <optgroup key={group.dayIndex} label={group.label}>
+                          {group.items.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.icon || '📌'} {s.title} · [{s.start_time} - {s.end_time}]
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                {/* 6. Mô tả & Ghi chú (Description) + Tags */}
+                <div className="space-y-2 pt-1 border-t border-slate-200/70 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-900 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Ghi chú & Đề bài / Tài liệu</span>
+                    </label>
+                  </div>
+                  <textarea
+                    rows={2}
+                    placeholder="Ghi chú chi tiết đề bài, tài liệu hoặc link nộp bài LMS..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+                  />
+
+                  {/* Hashtags */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5">
+                      <Hash className="w-3 h-3" />
+                      <span>Tags:</span>
+                    </span>
+                    {POPULAR_TAGS.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => handleToggleTag(tag)}
+                          className={`text-[10px] px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
+                              : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* ================= RIGHT COLUMN: KHÓA HỌC / TIẾT HỌC, LIVE PREVIEW & VIỆC CON ================= */}
+              <div className="lg:col-span-5 space-y-4">
+                
+                {/* 1. ĐÍNH KÈM KHÓA HỌC / MÔN HỌC & TIẾT HỌC (CHUYỂN QUA BÊN PHẢI NHƯ YÊU CẦU) */}
+                <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-2.5">
+                  <div className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Đính kèm Môn học & Tiết học cụ thể</span>
+                  </div>
+
+                  <div className="space-y-2">
                     <div>
-                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1">
-                        <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>Môn học / Khóa học</span>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs">
+                        Môn học / Khóa học
                       </label>
                       <select
                         value={selectedCourseId || ''}
@@ -689,7 +756,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                           setSelectedCourseId(val);
                           setCourseNodeId(undefined);
                         }}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                       >
                         <option value="">-- Không chọn môn học --</option>
                         {courses.map((c) => (
@@ -722,7 +789,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                             }
                           }
                         }}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
                       >
                         <option value="">
                           {!selectedCourseId
@@ -743,22 +810,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* ================= RIGHT COLUMN: XEM TRƯỚC, VIỆC CON & NÂNG CAO ================= */}
-              <div className="lg:col-span-5 space-y-4">
-                
-                {/* 1. THẺ XEM TRƯỚC THỰC TẾ (STICKY LIVE PREVIEW CARD) */}
-                <div className="sticky top-0 z-10 space-y-2">
+                {/* 2. THẺ XEM TRƯỚC THỰC TẾ (LIVE PREVIEW CARD) */}
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     <span className="flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Xem trước hiển thị (Live Preview)</span>
+                      <span>Xem trước hiển thị</span>
                     </span>
                     <span className="text-[10px] font-normal text-slate-400">Thời gian thực</span>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 shadow-md space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 shadow-md space-y-2.5">
                     {/* Header: Priority & Difficulty */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
@@ -778,7 +841,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
                     {/* Task Title */}
                     <div>
-                      <h4 className={`text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 ${!title.trim() ? 'italic text-slate-400 dark:text-slate-500' : ''}`}>
+                      <h4 className={`text-sm font-bold text-slate-900 dark:text-slate-100 ${!title.trim() ? 'italic text-slate-400 dark:text-slate-500' : ''}`}>
                         {title.trim() || 'Chưa nhập tiêu đề nhiệm vụ...'}
                       </h4>
                       {description.trim() && (
@@ -788,37 +851,25 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       )}
                     </div>
 
-                    {/* Badges for Links: Course & Fixed Schedule */}
-                    <div className="flex flex-wrap gap-1.5 text-[11px]">
-                      {selectedCourse && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-medium">
-                          <BookOpen className="w-3 h-3 text-emerald-600" />
-                          <span>{selectedCourse.title}</span>
-                          {selectedLesson && <span>· {selectedLesson.title}</span>}
-                        </span>
-                      )}
+                    {/* Badges: Course & Fixed Schedule */}
+                    {(selectedCourse || selectedFixedSchedule) && (
+                      <div className="flex flex-wrap gap-1.5 text-[11px]">
+                        {selectedCourse && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-medium">
+                            <BookOpen className="w-3 h-3 text-emerald-600" />
+                            <span>{selectedCourse.title}</span>
+                            {selectedLesson && <span>· {selectedLesson.title}</span>}
+                          </span>
+                        )}
 
-                      {selectedFixedSchedule && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-medium">
-                          <Pin className="w-3 h-3 text-indigo-600" />
-                          <span>{selectedFixedSchedule.icon || '📌'} {selectedFixedSchedule.title}</span>
-                        </span>
-                      )}
-
-                      {currentGoal && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-medium">
-                          <Target className="w-3 h-3 text-amber-600" />
-                          <span>{currentGoal.title}</span>
-                        </span>
-                      )}
-
-                      {estimatedPomodoros > 1 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-medium">
-                          <Timer className="w-3 h-3 text-rose-600" />
-                          <span>{estimatedPomodoros} Pomodoro (~{estimatedPomodoros * 25}p)</span>
-                        </span>
-                      )}
-                    </div>
+                        {selectedFixedSchedule && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-medium">
+                            <Pin className="w-3 h-3 text-indigo-600" />
+                            <span>{selectedFixedSchedule.icon || '📌'} {selectedFixedSchedule.title}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Deadline Countdown & Time */}
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
@@ -856,8 +907,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   </div>
                 </div>
 
-                {/* 2. DANH SÁCH VIỆC CON (SUBTASKS CHECKLIST WITH REORDER & PROGRESS) */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-850/60 border border-slate-200 dark:border-slate-800 space-y-3">
+                {/* 3. DANH SÁCH VIỆC CON (SUBTASKS CHECKLIST) */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-850/60 border border-slate-200 dark:border-slate-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <label className="text-slate-900 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5">
                       <CheckSquare className="w-3.5 h-3.5 text-emerald-500" />
@@ -895,7 +946,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     </button>
                   </div>
 
-                  {/* List of Subtasks with Checkbox, Reordering, Delete */}
+                  {/* List of Subtasks */}
                   {subtasks.length > 0 ? (
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                       {subtasks.map((st, i) => (
@@ -925,31 +976,28 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                           </div>
 
                           <div className="flex items-center gap-1 ml-2 shrink-0">
-                            {/* Move Up */}
                             <button
                               type="button"
                               disabled={i === 0}
                               onClick={() => handleMoveSubtask(i, 'UP')}
-                              className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20 transition"
+                              className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20 transition cursor-pointer"
                               title="Chuyển lên trên"
                             >
                               <ArrowUp className="w-3 h-3" />
                             </button>
-                            {/* Move Down */}
                             <button
                               type="button"
                               disabled={i === subtasks.length - 1}
                               onClick={() => handleMoveSubtask(i, 'DOWN')}
-                              className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20 transition"
+                              className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20 transition cursor-pointer"
                               title="Chuyển xuống dưới"
                             >
                               <ArrowDown className="w-3 h-3" />
                             </button>
-                            {/* Delete */}
                             <button
                               type="button"
                               onClick={() => handleRemoveSubtask(i)}
-                              className="p-1 rounded text-slate-400 hover:text-rose-500 transition"
+                              className="p-1 rounded text-slate-400 hover:text-rose-500 transition cursor-pointer"
                               title="Xóa việc con này"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -964,216 +1012,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     </div>
                   )}
                 </div>
-
-                {/* 3. LIÊN KẾT NÂNG CAO (ACCORDION THU GỌN: MỤC TIÊU, DỰ ÁN, GHI CHÚ, LẶP LẠI, POMODORO, TAGS) */}
-                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-850/50">
-                  <button
-                    type="button"
-                    onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                    className="w-full px-4 py-3 flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-indigo-500" />
-                      <span>Liên kết nâng cao & Tùy chọn học tập</span>
-                      {(goalId || projectId || recurrenceRule !== 'NONE' || description || selectedTags.length > 0) && (
-                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                      )}
-                    </div>
-                    {isAdvancedOpen ? (
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    )}
-                  </button>
-
-                  {isAdvancedOpen && (
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-4 text-xs">
-                      {/* Mục tiêu & Dự án */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1 text-xs flex items-center gap-1">
-                            <Target className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Mục tiêu dài hạn</span>
-                          </label>
-                          <select
-                            value={goalId || ''}
-                            onChange={(e) => {
-                              const val = e.target.value ? Number(e.target.value) : undefined;
-                              setGoalId(val);
-                              setProjectId(undefined);
-                            }}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          >
-                            <option value="">-- Không chọn mục tiêu --</option>
-                            {safeGoals.map((g) => (
-                              <option key={g.id} value={g.id}>
-                                {g.title}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1 text-xs flex items-center gap-1">
-                            <Layers className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Dự án trực thuộc</span>
-                          </label>
-                          <select
-                            value={projectId || ''}
-                            disabled={!goalId || availableProjects.length === 0}
-                            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : undefined)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
-                          >
-                            <option value="">-- Không chọn dự án --</option>
-                            {availableProjects.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.title}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Nhiệm vụ lặp lại (Recurrence) & Nhắc nhở */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1 text-xs flex items-center gap-1">
-                            <Repeat className="w-3.5 h-3.5 text-blue-500" />
-                            <span>Lặp lại nhiệm vụ</span>
-                          </label>
-                          <select
-                            value={recurrenceRule}
-                            onChange={(e) => setRecurrenceRule(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          >
-                            <option value="NONE">Không lặp lại</option>
-                            <option value="DAILY">Hằng ngày (Mỗi tối ôn tập)</option>
-                            <option value="WEEKDAYS">Thứ 2 – Thứ 6 (Ngày học)</option>
-                            <option value="WEEKLY">Hằng tuần (Vào thứ này)</option>
-                            <option value="MONTHLY">Hằng tháng</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1 text-xs flex items-center gap-1">
-                            <Bell className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Nhắc nhở trước hạn chót</span>
-                          </label>
-                          <select
-                            value={reminder}
-                            onChange={(e) => setReminder(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          >
-                            <option value="NONE">Không nhắc</option>
-                            <option value="10M">Trước 10 phút</option>
-                            <option value="30M">Trước 30 phút</option>
-                            <option value="1H">Trước 1 giờ</option>
-                            <option value="1D">Trước 1 ngày</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Dự kiến Pomodoro tập trung */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center gap-1">
-                            <Timer className="w-3.5 h-3.5 text-rose-500" />
-                            <span>Dự kiến số phiên Pomodoro 🍅</span>
-                          </label>
-                          <span className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold font-mono">
-                            {estimatedPomodoros * 25} phút tập trung
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {[1, 2, 3, 4].map((num) => (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => setEstimatedPomodoros(num)}
-                              className={`py-1 rounded-lg border text-xs font-semibold transition ${
-                                estimatedPomodoros === num
-                                  ? 'bg-rose-500 border-rose-500 text-white shadow-xs'
-                                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                              }`}
-                            >
-                              {num} 🍅 ({num * 25}p)
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Nhãn tag tùy chỉnh */}
-                      <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1 text-xs flex items-center gap-1">
-                          <Hash className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Nhãn phân loại (Tags)</span>
-                        </label>
-                        <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                          {POPULAR_TAGS.map((tag) => {
-                            const isSelected = selectedTags.includes(tag);
-                            return (
-                              <button
-                                key={tag}
-                                type="button"
-                                onClick={() => handleToggleTag(tag)}
-                                className={`text-[11px] px-2 py-0.5 rounded-md border transition cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
-                                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400'
-                                }`}
-                              >
-                                {tag}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Thêm tag khác (VD: #chuyende)..."
-                            value={customTagInput}
-                            onChange={(e) => setCustomTagInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddCustomTag();
-                              }
-                            }}
-                            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-900 dark:text-slate-100"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleAddCustomTag}
-                            className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-xs font-medium"
-                          >
-                            + Tag
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Mô tả & Ghi chú chi tiết */}
-                      <div>
-                        <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1 text-xs flex items-center gap-1">
-                          <FileText className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Mô tả & Ghi chú (Đề bài, tài liệu, link nộp bài)</span>
-                        </label>
-                        <textarea
-                          rows={2}
-                          placeholder="Ghi chú chi tiết, tài liệu tham khảo hoặc link nộp bài LMS..."
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Sticky Modal Footer: Outside Scroll Viewport */}
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-850/90 backdrop-blur-md shrink-0 flex flex-wrap items-center justify-between gap-3">
+          {/* Sticky Modal Footer */}
+          <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-850/90 backdrop-blur-md shrink-0 flex flex-wrap items-center justify-between gap-3">
             <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span>Gán nhiệm vụ vào Lịch cố định để tự động hiển thị trong thời khóa biểu tuần.</span>

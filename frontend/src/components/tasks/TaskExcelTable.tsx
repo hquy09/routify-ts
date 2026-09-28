@@ -50,6 +50,7 @@ export const TaskExcelTable: React.FC<TaskExcelTableProps> = ({
   const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
   const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'PARTIAL').length;
   const delayedTasks = tasks.filter((t) => t.status === 'DELAYED').length;
+  const transferredTasks = tasks.filter((t) => t.status === 'TRANSFERRED' || Boolean(t.transferred_to_id)).length;
   const totalXP = tasks.reduce((sum, t) => sum + (t.status === 'COMPLETED' ? (t.difficulty || 2) : 0), 0);
   const potentialXP = tasks.reduce((sum, t) => sum + (t.difficulty || 2), 0);
   const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -238,6 +239,7 @@ export const TaskExcelTable: React.FC<TaskExcelTableProps> = ({
               tasks.map((task, idx) => {
                 const isCompleted = task.status === 'COMPLETED';
                 const isDelayed = task.status === 'DELAYED';
+                const isTransferred = task.status === 'TRANSFERRED' || Boolean(task.transferred_to_id) || Boolean(task.transferred_from_id);
                 const isExpanded = expandedSubtaskId === task.id;
 
                 // Priority Config
@@ -266,6 +268,8 @@ export const TaskExcelTable: React.FC<TaskExcelTableProps> = ({
                       className={`transition-colors border-b border-slate-100 dark:border-slate-800/80 group ${
                         isCompleted
                           ? 'bg-emerald-50/20 dark:bg-emerald-950/10 text-slate-400 dark:text-slate-500'
+                          : isTransferred
+                          ? 'bg-purple-50/50 dark:bg-purple-950/25 border-l-4 border-l-purple-500 dark:border-l-purple-400'
                           : isDelayed
                           ? 'bg-rose-50/30 dark:bg-rose-950/20'
                           : idx % 2 === 0
@@ -284,9 +288,19 @@ export const TaskExcelTable: React.FC<TaskExcelTableProps> = ({
                           type="button"
                           onClick={() => onToggleStatus(task)}
                           className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
-                          title={isCompleted ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu đã hoàn thành'}
+                          title={
+                            task.status === 'TRANSFERRED'
+                              ? 'Nhiệm vụ đã chuyển tiếp sang thời điểm khác'
+                              : isCompleted
+                              ? 'Đánh dấu chưa hoàn thành'
+                              : 'Đánh dấu đã hoàn thành'
+                          }
                         >
-                          {isCompleted ? (
+                          {task.status === 'TRANSFERRED' ? (
+                            <div className="w-4 h-4 mx-auto rounded flex items-center justify-center bg-purple-100 dark:bg-purple-900/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 shadow-2xs">
+                              <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                            </div>
+                          ) : isCompleted ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100 dark:fill-emerald-950" />
                           ) : (
                             <Circle className="w-4 h-4 text-slate-400 hover:text-emerald-500" />
@@ -309,7 +323,7 @@ export const TaskExcelTable: React.FC<TaskExcelTableProps> = ({
                               : task.status === 'PARTIAL'
                               ? 'bg-amber-100/80 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
                               : task.status === 'TRANSFERRED'
-                              ? 'bg-purple-100/80 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                              ? 'bg-purple-100/80 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800 shadow-2xs font-extrabold'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                           }`}
                         >
@@ -328,14 +342,34 @@ export const TaskExcelTable: React.FC<TaskExcelTableProps> = ({
                           onClick={() => onEdit(task)}
                           className="cursor-pointer group/title flex flex-col"
                         >
-                          <span
-                            className={`font-bold text-xs truncate leading-snug group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 ${
-                              isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-slate-100'
-                            }`}
-                            title={task.title}
-                          >
-                            {task.title}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`font-bold text-xs truncate leading-snug group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 ${
+                                isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-slate-100'
+                              }`}
+                              title={task.title}
+                            >
+                              {task.title}
+                            </span>
+                            {(task.status === 'TRANSFERRED' || Boolean(task.transferred_to_id)) && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md font-bold text-[9px] bg-purple-100 text-purple-800 dark:bg-purple-900/80 dark:text-purple-200 border border-purple-300 dark:border-purple-700 shadow-2xs shrink-0"
+                                title="Nhiệm vụ này đã được chuyển tiếp sang thời điểm mới"
+                              >
+                                <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                                <span>Đã chuyển tiếp</span>
+                              </span>
+                            )}
+                            {Boolean(task.transferred_from_id) && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md font-bold text-[9px] bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 shadow-2xs shrink-0"
+                                title={`Nhiệm vụ nhận từ chuyển tiếp${task.transferred_from_date ? ` (từ ngày ${new Date(task.transferred_from_date).toLocaleDateString('vi-VN')})` : ''}`}
+                              >
+                                <CornerDownRight className="w-2.5 h-2.5 stroke-[2.5]" />
+                                <span>Nhận chuyển tiếp</span>
+                              </span>
+                            )}
+                          </div>
                           {task.description && (
                             <span className="text-[10px] text-slate-400 truncate mt-0.5" title={task.description}>
                               {task.description}
@@ -526,7 +560,12 @@ export const TaskExcelTable: React.FC<TaskExcelTableProps> = ({
                 <span className="font-bold">{totalTasks}</span> nhiệm vụ
               </td>
               <td colSpan={2} className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400">
-                ✓ {completedTasks} xong ({progressPercent}%)
+                <span>✓ {completedTasks} xong ({progressPercent}%)</span>
+                {transferredTasks > 0 && (
+                  <span className="ml-2 font-bold text-purple-600 dark:text-purple-400">
+                    • ↪️ {transferredTasks} chuyển tiếp
+                  </span>
+                )}
               </td>
               <td className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-700 text-rose-600 dark:text-rose-400">
                 {delayedTasks > 0 ? `⚠️ ${delayedTasks} trễ hạn` : '0 trễ'}
